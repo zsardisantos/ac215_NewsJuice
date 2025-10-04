@@ -1,20 +1,43 @@
-# news_feed_test
+# News Feed Test
 
-simple prototype for pulling newsfeeds from RSS source
+A simple prototype for pulling news feeds from an RSS source.
 
-do:
+---
 
+## Getting Started
+
+### 1. Build the Docker image
+
+```bash
 docker build -t news-feed -f Dockerfile .
+```
 
+### 2. Run the Docker container
+
+```bash
 docker run --rm -ti -v "$(pwd)":/app news-feed
+```
 
-and then in container: 
+### 3. Execute the test script inside the container
 
+```bash
 python news_feed_test.py
+```
 
-possible next steps:
-* identify Harvard sources
-* other formats of sources (those are RSS feeds only)
-* have a file with a list of sources that is read in on run time (now hard coded)
-* clean the feeds and store in a file
-* define database structure and load news into it
+---
+
+## Possible Next Steps
+
+- Identify Harvard-specific sources.  
+- Support additional formats beyond RSS.  
+- Move source URLs into a configuration file that can be read at runtime (currently hard-coded).  
+- Clean and preprocess the feeds, then store them in a structured file.  
+- Define a database schema and load the cleaned news data into it.  
+
+---
+
+## Notes
+
+- This is an early-stage prototype.  
+- For now, only a single RSS feed is hard-coded.  
+- Designed to be a lightweight experiment to inform the next iteration of the project.
