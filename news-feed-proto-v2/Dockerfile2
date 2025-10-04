@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+# System libs for lxml/trafilatura
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libxml2-dev libxslt1-dev curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh -s -- -y
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml ./
+COPY app ./app
+
+# Create virtualenv with uv and install dependencies there
+RUN uv venv /app/.venv && \
+    . /app/.venv/bin/activate && \
+    uv pip install .
+
+# Make sure our venv python/pip are used by default
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["python", "-m", "app.main"]
