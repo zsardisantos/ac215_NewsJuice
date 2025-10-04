@@ -73,6 +73,11 @@ docker run --rm -it   -e DATABASE_URL="postgresql://postgres:Newsjuice25%2B@host
 
 ---
 
+### 4. Run the app inside the container
+```bash
+python main.py
+```
+
 ## Expected Result
 
 If everything is configured correctly:
