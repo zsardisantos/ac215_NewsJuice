@@ -30,6 +30,6 @@ COPY . ./
 #ENTRYPOINT ["/bin/bash"]
 #CMD ["-c", "source /home/app/.venv/bin/activate && exec bash"]
 # Default command (Compose will override with wait_for_db + your script)
-CMD ["python", "main.py", "--out", "/data/news.jsonl"]
+CMD ["python", "scraper.py"]
 
 # TEST
