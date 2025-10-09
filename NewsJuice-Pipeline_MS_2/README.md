@@ -102,6 +102,12 @@ Database Information
 
 The SQL proxy is started in the docker-compose file and runs in the background. This opens a local port (`5432`) and connects securely to the Cloud SQL instance.
 
+Run the SQL proxy with:
+
+```bash
+cloud-sql-proxy   --credentials-file=./secrets/sa-key.json   --port 5432   newsjuice-123456:us-central1:newsdb-instance
+```
+
 - `./artifacts` and `./secrets` are dockerignored and gitignored
 - In **development**, you must run the Cloud SQL proxy locally.  
 - Later in **production**, direct access to the managed Cloud SQL database can be configured, and the proxy may not be needed.  
