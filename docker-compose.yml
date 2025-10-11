@@ -1,0 +1,81 @@
+services:
+  # Step 1 — extractor: writes /data/news.jsonl then exits 0
+  scraper:
+    build: ./services/scraper
+    volumes:
+      - ./services/scraper:/app
+      - ./artifacts:/data
+      - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+    working_dir: /app
+    # change this to your actual extractor entrypoint
+    command:
+    - sh
+    - -lc
+    - >
+      /home/app/.venv/bin/python wait_for_db.py
+      && exec /home/app/.venv/bin/python scraper.py --out /data/news.jsonl
+    restart: "no"
+
+  # Step 2 — loader: reads the /data/news.jsonl file, chunks, embeds and loads to vector DB
+  loader:
+    build: ./services/loader
+    depends_on:
+      - dbproxy
+    volumes:
+      - ./services/loader:/app
+      - ./artifacts:/data
+      - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      GOOGLE_CLOUD_PROJECT: "newsjuice-123456" 
+      GOOGLE_CLOUD_REGION:  "us-central1"
+    working_dir: /app
+    # change this to your actual processor entrypoint
+    #command: ["python", "Vector_DB_query.py", "--in", "/data/news.jsonl"]
+    command:
+    - sh
+    - -lc
+    - >
+      /home/app/.venv/bin/python wait_for_db.py
+      && exec /home/app/.venv/bin/python loader.py --out /data/news.jsonl
+    restart: "no"
+
+
+# Step 3 — retriever: asks for briefung and retrieves top 2 from vector DB
+  retriever:
+    build: ./services/retriever
+    depends_on:
+      - dbproxy
+    volumes:
+      - ./services/retriever:/app
+      - ./artifacts:/data
+      - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+    working_dir: /app
+    # change this to your actual processor entrypoint
+    #command: ["python", "Vector_DB_query.py", "--in", "/data/news.jsonl"]
+    command:
+    - sh
+    - -lc
+    - >
+      /home/app/.venv/bin/python wait_for_db.py
+      && exec /home/app/.venv/bin/python retriever.py --out /data/news.jsonl
+    restart: "no"
+
+  # Cloud SQL Auth Proxy so the processor can reach your DB
+  dbproxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2
+    command:
+      - "--port=5432"
+      - "--address=0.0.0.0"
+      - "--credentials-file=/run/secrets/gcp.json"
+      - "newsjuice-123456:us-central1:newsdb-instance"
+    volumes:
+      - ../secrets/sa-key.json:/run/secrets/gcp.json:ro
+    restart: unless-stopped
