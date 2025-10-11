@@ -1,4 +1,4 @@
-# NewsJuice Prototype Pipeline (WIP for Milestone 2)
+# TEST NewsJuice Prototype Pipeline (WIP for Milestone 2)
 
 This repository contains the **NewsJuice Prototype Pipeline**, a containerized system for **scraping**, **processing**, **retrieving**, and **summarizing** news content.  
 
