@@ -6,6 +6,10 @@ This repository contains the **NewsJuice Prototype Pipeline**, a containerized s
 
 ## ⚙️ Pipeline Overview
 
+Here pict->
+
+![Project logo](app-diagram.png)
+
 The pipeline consists of **four containers**, each responsible for a distinct stage of processing.  
 Artifacts are exchanged via the `./artifacts` directory.  
 A **PostgreSQL vector database** hosted on **Google Cloud SQL (GCS)** is used for storage.
