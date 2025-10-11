@@ -1,6 +1,6 @@
 .PHONY: run build scrape load retrieve up-proxy down clean rebuild
 
-run: build up-proxy load retrieve  ## Build images, start proxy, run both steps
+run: build up-proxy scrape load retrieve  ## Build images, start proxy, run both steps
 	@echo "✅ Pipeline finished."
 
 build:
