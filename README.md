@@ -1,4 +1,4 @@
-# 📰 NewsJuice
+# 📆 NewsJuice (AC215 - Milestone 2)
 
 > Personalized daily podcast summaries of Harvard-related news — built with a scalable RAG pipeline.
 
@@ -17,13 +17,13 @@
 
 ## 📚 Project Overview
 
-**NewsJuice** is an application that generates a **daily customized podcast** summarizing the latest news based on the user’s interests.  
+**NewsJuice** is an application that generates a **customized podcasts** summarizing the latest news based on the user’s interests.  
 It is primarily designed for the **Harvard community**, pulling content from Harvard-related news sources.
 
 Users can:
 - Set preferences and topics of interest  
 - Provide a short news brief  
-- Receive a **daily audio podcast** generated automatically  
+- Receive an **audio podcast** generated automatically  
 - *(Future)* Interactively **ask follow-up questions** during playback  
 
 ---
@@ -69,7 +69,7 @@ A **PostgreSQL vector database** (on **Google Cloud SQL**) serves as the central
    - **Combines** retrieved chunks with the briefing and user preferences (**promt augmentation**) 
    - Generates a summary via an **LLM** from the augmented prompt
    - Produces an **audio podcast file** (MP3) from the summary via text-to-speech conversion
-   - The chat history is stored in the `newsbd`
+   - The chat history is stored in the `newsdb`
 
 
 ---
@@ -80,32 +80,34 @@ This project supports both **one-line execution** and **step-by-step** runs usin
 
 ### ▶️ Quick Start (One-line)
 
-**Option 1: Docker Compose**
+**Option 1: Makefile** for a scraper - loader batch cycle and for a chatter cycle
+
+```bash
+make -f MakefileBatch run
+make -f MakefileChatter run
+
+```
+
+**Option 2: Docker Compose**
+
+**one command**
+
 ```bash
 docker compose build \
   && docker compose up -d dbproxy \
   && docker compose run --rm scraper \
   && docker compose run --rm loader \
-  && docker compose run --rm retriever \
-  && docker compose run --rm summarizer
+  && docker compose run --rm chatter
 ```
 
-### 🪜 Step-by-Step Execution
+**step by step**
 
 ```bash
 docker compose build
 docker compose up -d dbproxy
 docker compose run --rm scraper
 docker compose run --rm loader
-docker compose run --rm retriever
-docker compose run --rm summarizer
-```
-
-**Option 2: MakefileBatch** for a scraper - loader bacth cycle
-
-
-```bash
-make -f MakefileBatchrun
+docker compose run --rm chatter
 ```
 
 ---
@@ -217,7 +219,24 @@ embedding VECTOR(768),
 article_id TEXT
 ```
 
+### 🧠 Table: `llm conversations`
+Stores the history of conversations
+
+```sql
+id BIGSERIAL PRIMARY KEY,
+user_id
+model_name
+conversation_date
+created_at
+updated_at
+```
+
 ---
+
+
+## References
+
+For this project we have used ChatGPT, Gemini and tools like app.eraser.io for learrning purposes.
 
 ## 📜 License
 
