@@ -21,7 +21,7 @@ ARTICLES_TABLE_NAME = "articles"
 #ARTICLES_TABLE_NAME = "articles_test"
 VECTOR_TABLE_NAME = "chunks_vector"
 #VECTOR_TABLE_NAME = "chunks_vector_test"
-
+#test comment
 
 import pandas as pd
 import psycopg
