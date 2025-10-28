@@ -1,6 +1,13 @@
 #############################################################################
-###### IF bitsandbites WENT THROUGH THE INSTALLATION PROCESS
+###### This script is designed to run on colab. It was not tested elsewhere
+#############################################################################
+###### Dont forget to have the env variables setup in colab
+#############################################################################
+###### IF bitsandbites WENT THROUGH THE INSTALLATION PROCESS,
 ###### MAKE SURE TO RESTART THE SESSION, OTHERWISE IT WILL NOT WORK
+#############################################################################
+###### Data generation references the Cloud SQL, which needs the proxy,
+###### So make sure to run the data generation nocally with the proxy running
 #############################################################################
 
 # !pip install bitsandbytes         ## Needed when training on Colab
@@ -27,10 +34,10 @@ from transformers import (
 # Configuration
 GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get("GEMINI_SERVICE_ACCOUNT_PATH", "../../../secrets/gemini-service-account.json")
 GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
-GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
-QWEN_MODEL_PATH = os.environ.get("QWEN_MODEL_PATH", "Qwen/Qwen3-0.6B")
-QWEN_MAX_NEW_TOKENS = int(os.environ.get("QWEN_MAX_NEW_TOKENS", "512"))
-QWEN_TEMPERATURE = float(os.environ.get("QWEN_TEMPERATURE", "0.7"))
+GOOGLE_CLOUD_REGION = ( "us-central1")
+QWEN_MODEL_PATH = ("Qwen/Qwen3-0.6B")
+QWEN_MAX_NEW_TOKENS = ("512")
+QWEN_TEMPERATURE = ("0.7")
 PODCAST_LOG_CSV =("podcast_results.csv")
 
 try:
