@@ -1,0 +1,5 @@
+google-genai>=1.43.0
+google-adk
+requests
+beautifulsoup4
+lxml
