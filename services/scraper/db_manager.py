@@ -75,6 +75,43 @@ class PostgresDBManager:
                     inserted_count += cur.rowcount
         return inserted_count
 
+    def fetch_articles_without_summary(self, limit=None):
+        """Return articles that are missing a summary field."""
+        base_query = sql.SQL(
+            "SELECT id, article_id, title, content FROM {table} "
+            "WHERE summary IS NULL OR summary = '' "
+            "ORDER BY fetched_at NULLS LAST, id ASC"
+        ).format(table=sql.Identifier(self._table_name))
+
+        params = ()
+        if limit is not None:
+            base_query += sql.SQL(" LIMIT %s")
+            params = (limit,)
+
+        with psycopg.connect(self._dsn) as conn:
+            with conn.cursor() as cur:
+                if params:
+                    cur.execute(base_query, params)
+                else:
+                    cur.execute(base_query)
+                rows = cur.fetchall()
+
+        columns = ("id", "article_id", "title", "content")
+        return [dict(zip(columns, row)) for row in rows]
+
+    def update_article_summary(self, article_id, summary):
+        query = sql.SQL(
+            "UPDATE {table} SET summary = %s WHERE article_id = %s"
+        ).format(table=sql.Identifier(self._table_name))
+
+        with psycopg.connect(self._dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (summary, article_id))
+                updated = cur.rowcount
+            conn.commit()
+
+        return updated
+
 
 if __name__ == "__main__":
     dsn = os.environ.get("DATABASE_URL")

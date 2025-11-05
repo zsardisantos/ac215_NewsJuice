@@ -27,9 +27,11 @@ News Sources:
 
 '''
 
+import json
 import uuid
 import argparse
 from pathlib import Path
+from tqdm import tqdm
 from gazette_scraper import GazetteArticleScraper
 from crimson_scraper import CrimsonArticleScraper
 from harvard_magazine_scraper import HarvardMagazineArticleScraper
@@ -40,6 +42,7 @@ from hms_scraper import HmsArticleScraper
 from hks_scraper import HksArticleScraper
 from seas_scraper import SeasArticleScraper
 from db_manager import PostgresDBManager
+from article_tags_builder import call_gemini_api
 
 def main():
     # Parse command line arguments
@@ -53,76 +56,67 @@ def main():
     # Initialize database manager
     db_manager = PostgresDBManager(url_column="source_link")
 
-    print("\nStarting Gazette Scraper")
-    gazzet_scraper = GazetteArticleScraper(test_mode=False)
-    gazzet_details = gazzet_scraper.scrape()
+    sources = [
+        ("Gazette", GazetteArticleScraper(test_mode=False)),
+        ("Crimson", CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("Harvard Magazine", HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("GSAS", GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("HBS", HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("HLS", HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("HMS", HmsArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("HKS", HksArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+        ("SEAS", SeasArticleScraper(headless=True, test_mode=False, wait_ms=1000)),
+    ]
 
-    print("\nStarting Crimson Scraper")
-    crimson_scraper = CrimsonArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    crimson_details = crimson_scraper.scrape()
+    total_scraped = 0
+    total_inserted = 0
 
-    print("\nStarting Harvard Magazine Scraper")
-    harvard_magazine_scraper = HarvardMagazineArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    harvard_magazine_details = harvard_magazine_scraper.scrape()  
+    for label, scraper in sources:
+        print(f"\nStarting {label} Scraper")
+        try:
+            articles = scraper.scrape()
+        except Exception as exc:
+            print(f"[scraper-error] {label} scrape failed: {exc}")
+            continue
 
-    print("\nGSAS News Scraper")
-    gsas_news_scraper = GsasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    gsas_news_details = gsas_news_scraper.scrape()  
+        if not articles:
+            print(f"[scraper] {label}: no articles scraped")
+            continue
 
-    print("\nHBS  News Scraper")
-    hbs_news_scraper = HbsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    hbs_news_details = hbs_news_scraper.scrape()
-        
-    print("\nHLS  News Scraper")
-    hls_news_scraper = HlsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    hls_news_details = hls_news_scraper.scrape()
+        total_scraped += len(articles)
+        db_records = []
+        for article in tqdm(articles, desc=f"[tags] {label}", unit="article"):
+            summary_value = article.get("summary", "")
+            content = article.get("article_content", "") or ""
 
-    print("\nHMS  News Scraper")
-    hms_news_scraper = HmsArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    hms_news_details = hms_news_scraper.scrape()
+            prompt_source = content.strip()
+            if prompt_source:
+                tags_payload, error = call_gemini_api(prompt_source)
+                if error:
+                    print(f"[tags-error] {label} article tagging failed: {error}")
+                else:
+                    summary_value = json.dumps(tags_payload, ensure_ascii=False)
 
-    print("\nHKS  News Scraper")
-    hks_news_scraper = HksArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    hks_news_details = hks_news_scraper.scrape()
+            db_record = {
+                "author": article.get("article_author", ""),
+                "title": article.get("article_title", ""),
+                "summary": summary_value,
+                "content": article.get("article_content", ""),
+                "source_link": article.get("article_url", ""),
+                "source_type": article.get("source_type", ""),
+                "fetched_at": article.get("fetched_at"),
+                "published_at": article.get("article_publish_date"),
+                "vflag": 0,
+                "article_id": str(uuid.uuid4()),
+            }
+            db_records.append(db_record)
 
-    print("\nSEAS  News Scraper")
-    seas_news_scraper = SeasArticleScraper(headless=True, test_mode=False, wait_ms=1000)
-    seas_news_details = seas_news_scraper.scrape()
+        inserted_count = db_manager.insert_records(db_records)
+        total_inserted += inserted_count
+        print(f"[scraper] {label}: inserted {inserted_count}/{len(db_records)} new articles")
 
-    all_articles = [
-                    *gazzet_details,
-                    *crimson_details,
-                    *harvard_magazine_details,
-                    *gsas_news_details,
-                    *hbs_news_details,
-                    *hls_news_details,
-                    *hms_news_details,
-                    *hks_news_details,
-                    *seas_news_details
-                    ]
-    
-    # Map scraper field names to database column names
-    db_records = []
-    for article in all_articles:
-        db_record = {
-            "author": article.get("article_author", ""),
-            "title": article.get("article_title", ""),
-            "summary": article.get("summary", ""),
-            "content": article.get("article_content", ""),
-            "source_link": article.get("article_url", ""),
-            "source_type": article.get("source_type", ""),
-            "fetched_at": article.get("fetched_at"),
-            "published_at": article.get("article_publish_date"),
-            "vflag": 0,  # 0 = new/unprocessed
-            "article_id": str(uuid.uuid4()),  # Generate unique ID
-        }
-        db_records.append(db_record)
-    
-    # Insert into database
-    inserted_count = db_manager.insert_records(db_records)
-    print(f"\n✅ Inserted {inserted_count} new articles into the database.")
-    print(f"Total articles scraped: {len(all_articles)}")
-    print(f"Skipped (already in DB): {len(all_articles) - inserted_count}")
+    print(f"\n✅ Inserted {total_inserted} new articles across all sources.")
+    print(f"Total articles scraped: {total_scraped}")
     
     # # Optional: still write to JSONL for backup
     # with out.open("w", encoding="utf-8") as f:

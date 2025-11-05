@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from dateutil import parser as dateparser
 from datetime import timezone, datetime
+from urllib.parse import urljoin
 from db_manager import PostgresDBManager
 from time import sleep
 
@@ -132,11 +133,11 @@ class SeasArticleScraper:
                 page.wait_for_timeout(200)
 
             normalized_urls = []
+            base_url = "https://seas.harvard.edu"
             for url in article_urls:
-                if "https://seas.harvard.edu" not in url:
-                    normalized_urls.append("https://seas.harvard.edu" + url)
-                else:
-                    normalized_urls.append(url)
+                if not url:
+                    continue
+                normalized_urls.append(urljoin(base_url, url))
             article_urls = normalized_urls
             
             # Filter to only new URLs not in database

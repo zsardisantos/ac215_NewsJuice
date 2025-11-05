@@ -146,8 +146,8 @@ class GazetteArticleScraper:
             all_articles_details.append(article_details)
 
         
-        print("Gazette Scraper Summary:")
-        print(f"\n\nTotal number of articles: {len(all_articles_details)}")
+        print("\n\nGazette Scraper Summary:")
+        print(f"\nTotal number of articles: {len(all_articles_details)}")
         blank_content = len([d for d in all_articles_details if not d["article_content"] or d["article_content"].strip() == ""])
         blank_author = len([d for d in all_articles_details if not d["article_author"] or d["article_author"].strip() == ""])
         blank_title = len([d for d in all_articles_details if not d["article_title"] or d["article_title"].strip() == ""])
@@ -156,6 +156,7 @@ class GazetteArticleScraper:
         print(f"Blank article author: {blank_author}")
         print(f"Blank article title: {blank_title}")
         print(f"Blank article publish date: {blank_publish_date}")
+        print("")
 
         return all_articles_details
 

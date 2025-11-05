@@ -1,6 +1,7 @@
 .DS_Store
 services/scraper/artifacts/
 artifacts/
+qwen_qlora_podcast/
 secrets/
 .env
 __pycache__/

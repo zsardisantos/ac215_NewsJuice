@@ -1,9 +1,17 @@
+#############################################################################
+###### This script is designed to run on colab. It was not tested elsewhere
+#############################################################################
+###### Dont forget to have the env variables setup in colab
+#############################################################################
+
 import os
 import csv
 import json
 import torch
 from vertexai.generative_models import GenerativeModel
+#!pip import psycopg
 import psycopg
+from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -11,15 +19,16 @@ from transformers import (
 )
 
 # Configuration
-# Construct an absolute path to the secrets file to avoid relative path issues.
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-GEMINI_SERVICE_ACCOUNT_PATH = os.path.join(_script_dir, "..", "..", "..", "secrets", "gemini-service-account.json")
+
+#GEMINI_SERVICE_ACCOUNT_PATH =  "gemini-service-account.json"    #For running on colab. make sure that the secrets file is placed in the contents folder
+#GEMINI_SERVICE_ACCOUNT_PATH =  "../../../secrets/gemini-service-account.json"     ## For testing Locally
 GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
 GOOGLE_CLOUD_REGION = ( "us-central1")
 QWEN_MODEL_PATH = ("Qwen/Qwen3-0.6B")
 # Qwen pipeline expects numeric types for these parameters.
-QWEN_MAX_NEW_TOKENS = (512)
+QWEN_MAX_NEW_TOKENS = int(WORD_LIMIT * 1.5)
 QWEN_TEMPERATURE = (0.7)
+QWEN_BATCH_SIZE = 4    #Running Qwen in batches of 4 for quicker generation
 PODCAST_LOG_CSV =("podcast_results.csv")
 
 _qwen_pipeline = None
@@ -100,7 +109,7 @@ def get_random_chunk(conn):
 
 def create_prompt(context):
     prompt = f"""You are a news podcast host. Based on the following relevant news articles, create an engaging podcast-style script to the user's question. 
-            Please limit the podcast generation to 300 words. You should only include the text of the script. Do not include any of your thoughts or any sound effects.    
+            The script must be no longer than 300 words under any circumstance. Make sure you dont go over the spesified word limit You should only include the text of the script. Do not include any of your thoughts or any sound effects.    
 
 article context: {context}
 
@@ -109,53 +118,93 @@ Please create a podcast-style response that:
 2. Directly addresses the user's question using information from the articles
 3. Weaves together insights from the relevant news articles
 4. Maintains a conversational, podcast-like tone
-5. Ends with a thoughtful conclusion
+5. Ends with a thoughtful conclusion that stays within the 300-word limit
 
 If the articles don't contain enough information to fully answer the question, acknowledge this and provide what insights you can while being transparent about limitations.
 
 Format your response as if you're speaking directly to the listener in a podcast episode."""
     return prompt
 
+
+def enforce_word_limit(text, limit=WORD_LIMIT):
+    """Ensure the generated text does not exceed the desired word limit."""
+    if not text:
+        return text
+
+    words = text.strip().split()
+    if len(words) <= limit:
+        return text.strip()
+
+    trimmed = " ".join(words[:limit])
+    return trimmed.strip()
+
+
+def word_count(text):
+    """Return the number of words in the provided text."""
+    if not text:
+        return 0
+    return len(text.strip().split())
+
 def call_gemini_api(prompt, model):
     """Call Google Gemini API with the question and context articles to generate a podcast-style response."""
     if not model:
         return None, "Gemini API not configured"
-        
+
     response = model.generate_content(prompt)
-    return response.text, None
+    limited_text = enforce_word_limit(response.text, WORD_LIMIT)
+    return limited_text, None
 
 def call_local_qwen(prompt):
-    """Generate podcast text using locally hosted Qwen model."""
+    outputs, errors = call_local_qwen_batch([prompt])
+    return outputs[0], errors[0]
+
+
+def call_local_qwen_batch(prompts):
+    """Generate podcast text using locally hosted Qwen model for a batch of prompts."""
     try:
         generator = ensure_qwen_pipeline()
-        outputs = generator(
-            prompt,
+        results = generator(
+            prompts,
             max_new_tokens=QWEN_MAX_NEW_TOKENS,
             temperature=QWEN_TEMPERATURE,
             do_sample=QWEN_TEMPERATURE > 0,
             return_full_text=True,
         )
-        generated = outputs[0]["generated_text"]
-        if generated.startswith(prompt):
-            generated = generated[len(prompt):].strip()
-        return generated.strip(), None
+
+        texts = []
+        errors = [None] * len(prompts)
+
+        # The pipeline returns a nested list when multiple prompts are provided.
+        for idx, output in enumerate(results):
+            sequences = output if isinstance(output, list) else [output]
+            generated = sequences[0]["generated_text"]
+            prompt = prompts[idx]
+            if generated.startswith(prompt):
+                generated = generated[len(prompt):].strip()
+            texts.append(enforce_word_limit(generated, WORD_LIMIT))
+
+        return texts, errors
+
     except Exception as exc:
-        return None, f"Error generating with Qwen: {exc}"
+        error_message = f"Error generating with Qwen: {exc}"
+        return [None] * len(prompts), [error_message] * len(prompts)
 
 def ensure_qwen_pipeline():
     global _qwen_pipeline
     if _qwen_pipeline is None:
         tokenizer = AutoTokenizer.from_pretrained(QWEN_MODEL_PATH, token=HF_TOKEN, trust_remote_code=True)
+        torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         model = AutoModelForCausalLM.from_pretrained(
             QWEN_MODEL_PATH,
             device_map="auto" if torch.cuda.is_available() else None,
-            torch_dtype="auto",
+            torch_dtype=torch_dtype,
             trust_remote_code=True,
         )
         _qwen_pipeline = pipeline(
             "text-generation",
             model=model,
             tokenizer=tokenizer,
+            model_kwargs={"torch_dtype": torch_dtype},
         )
     return _qwen_pipeline
 
@@ -178,8 +227,8 @@ def append_podcast_result(chunk_text, gemini_text, qwen_text, csv_path=PODCAST_L
                 "chunk_text": chunk_text,
                 "gemini_podcast_text": gemini_text or "",
                 "qwen_podcast_text": qwen_text or "",
-                "gemini_length": len(gemini_text) if gemini_text else 0,
-                "qwen_length": len(qwen_text) if qwen_text else 0,
+                "gemini_length": word_count(gemini_text),
+                "qwen_length": word_count(qwen_text),
             }
         )
 
@@ -206,16 +255,11 @@ def get_and_save_chunks(conn, training_samples, filename="chunks_for_processing.
 
 def generate_training_data(training_samples, get_chunks=True, get_generation=False):
     
-    
-
     # 1. Get and save all chunks first
     if get_chunks:
         conn = connect_to_gc_db()
         chunks = get_and_save_chunks(conn, training_samples)
         conn.close() 
-
-    gemini_results = []
-    qwen_results = []
 
     if get_generation:
         # Always load chunks from the file for the generation step.
@@ -227,36 +271,41 @@ def generate_training_data(training_samples, get_chunks=True, get_generation=Fal
             print(f"Error loading chunks from file: {e}. Please run with get_chunks=True first.")
             return
 
+        prompts = [create_prompt(chunk['chunk']) for chunk in chunks]
+
+        # 2. Run Qwen first (batched) so results are ready when Gemini finishes each chunk
+        print("\n--- Running Qwen generation in batches ---")
+        qwen_outputs = [None] * len(prompts)
+        qwen_errors_all = [None] * len(prompts)
+        for batch_start in tqdm(range(0, len(prompts), QWEN_BATCH_SIZE), desc="Qwen batches", unit="batch"):
+            batch_end = batch_start + QWEN_BATCH_SIZE
+            batch_prompts = prompts[batch_start:batch_end]
+            qwen_texts, qwen_errors = call_local_qwen_batch(batch_prompts)
+
+            for offset, chunk_idx in enumerate(range(batch_start, batch_end)):
+                if chunk_idx >= len(chunks):
+                    break
+
+                qwen_outputs[chunk_idx] = qwen_texts[offset]
+                qwen_errors_all[chunk_idx] = qwen_errors[offset]
+                if qwen_errors[offset]:
+                    print(f"[qwen-error] {qwen_errors[offset]}")
+
+        # 3. Run Gemini calls and append results immediately using stored Qwen outputs
         model = connect_to_gemini()
-        # 2. Run all calls to the Gemini API
-        print("\n--- Calling Gemini API for all chunks ---")
-        for i, chunk in enumerate(chunks):
-            print(f"Processing chunk {i+1}/{len(chunks)} for Gemini...")
-            prompt = create_prompt(chunk['chunk'])
-            gemini_podcast_text, gemini_error = call_gemini_api(prompt, model)
+        print("\n--- Running Gemini generation for all chunks ---")
+        for idx, prompt in enumerate(tqdm(prompts, desc="Gemini generations", unit="chunk"), start=1):
+            gemini_text, gemini_error = call_gemini_api(prompt, model)
             if gemini_error:
                 print(f"[gemini-error] {gemini_error}")
-            gemini_results.append(gemini_podcast_text)
+                gemini_text = None
 
-        # 3. Run all calls to the local Qwen model
-        print("\n--- Calling local Qwen model for all chunks ---")
-        for i, chunk in enumerate(chunks):
-            print(f"Processing chunk {i+1}/{len(chunks)} for Qwen...")
-            prompt = create_prompt(chunk['chunk'])
-            qwen_podcast_text, qwen_error = call_local_qwen(prompt)
-            if qwen_error:
-                print(f"[qwen-error] {qwen_error}")
-            qwen_results.append(qwen_podcast_text)
-
-        # 4. Append all results to the CSV file
-        print("\n--- Appending all results to CSV ---")
-        for i, chunk in enumerate(chunks):
             append_podcast_result(
-                chunk['chunk'],
-                gemini_results[i],
-                qwen_results[i],
+                chunks[idx - 1]['chunk'],
+                gemini_text,
+                qwen_outputs[idx - 1],
             )
-        print(f"[info] {len(chunks)} podcast texts appended to podcast_results.csv")
+            print(f"[info] Podcast texts appended for chunk {idx}/{len(chunks)}")
 
 if __name__=="__main__":
-    generate_training_data(training_samples=2000, get_chunks=True, get_generation=False)
+    generate_training_data(training_samples=2000, get_chunks=False, get_generation=True)
