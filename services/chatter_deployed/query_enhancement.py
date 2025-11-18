@@ -1,8 +1,9 @@
 """
 Query Enhancement Module
 
-Handles the conversation loop with Gemini LLM to refine user queries before retrieval.
+Handles query enhancement with Gemini LLM to improve user queries before retrieval.
 Uses the system prompt from query_enhancement.txt to guide the enhancement process.
+Enhances the query once and returns the improved version for immediate use.
 """
 
 import os
@@ -37,11 +38,10 @@ def load_system_prompt() -> str:
 Every response must strictly follow this JSON schema:
 {
   "original_query": "<the user's original query>",
-  "enhanced_query": "<the LLM's improved and more specific version, possibly containing multiple explicit questions>",
-  "clarification_question": "<a short, self-contained, natural spoken question that summarizes your understanding using reflective phrasing and ends with a gentle confirmation>"
+  "enhanced_query": "<the LLM's improved and more specific version, possibly containing multiple explicit questions>"
 }
 
-The clarification_question is the only part the user hears, so it must be fully self-contained and end with a confirmation phrase like 'does that sound right?'"""
+The enhanced query will be used directly for retrieving relevant news articles. Produce the best possible enhanced query on the first attempt."""
 
 
 def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
@@ -62,8 +62,8 @@ def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
         # Parse the JSON
         result = json.loads(json_str)
         
-        # Validate required fields
-        if all(key in result for key in ["original_query", "enhanced_query", "clarification_question"]):
+        # Validate required fields (clarification_question is optional now)
+        if all(key in result for key in ["original_query", "enhanced_query"]):
             return result
         else:
             print(f"[query-enhancement-error] Missing required fields in response: {result}")
@@ -79,16 +79,14 @@ def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
 
 def enhance_query_with_gemini(
     user_query: str,
-    model: GenerativeModel,
-    conversation_history: Optional[list] = None
+    model: GenerativeModel
 ) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """
     Call Gemini to enhance a user query.
     
     Args:
-        user_query: The user's original or follow-up query
+        user_query: The user's original query
         model: The Gemini model instance
-        conversation_history: Optional list of previous messages for context
         
     Returns:
         Tuple of (parsed_response_dict, error_message)
@@ -100,23 +98,7 @@ def enhance_query_with_gemini(
         system_prompt = load_system_prompt()
         
         # Build the prompt
-        if conversation_history:
-            # Include conversation history for context
-            history_text = "\n".join([
-                f"User: {msg.get('user', '')}\nAssistant: {msg.get('assistant', '')}"
-                for msg in conversation_history
-            ])
-            prompt = f"""{system_prompt}
-
-CONVERSATION HISTORY:
-{history_text}
-
-CURRENT USER QUERY: {user_query}
-
-Please provide your response in the required JSON format."""
-        else:
-            # First interaction
-            prompt = f"""{system_prompt}
+        prompt = f"""{system_prompt}
 
 USER QUERY: {user_query}
 
@@ -137,36 +119,3 @@ Please provide your response in the required JSON format."""
     except Exception as e:
         print(f"[query-enhancement-error] Error calling Gemini: {e}")
         return None, str(e)
-
-
-def is_confirmation(user_response: str) -> bool:
-    """
-    Check if the user's response indicates confirmation.
-    
-    Returns True if the user confirms (e.g., "yes", "that's right", "correct", etc.)
-    """
-    confirmation_keywords = [
-        "yes", "yeah", "yep", "yup", "correct", "right", "that's right", 
-        "exactly", "that's it", "sounds good", "perfect", "that works",
-        "sure", "okay", "ok", "alright", "go ahead", "proceed", "continue"
-    ]
-    
-    user_lower = user_response.lower().strip()
-    
-    # Check for confirmation phrases
-    for keyword in confirmation_keywords:
-        if keyword in user_lower:
-            return True
-    
-    # Check for negation (not a confirmation)
-    negation_keywords = ["no", "nope", "not", "wrong", "incorrect", "that's not", "that isn't"]
-    for keyword in negation_keywords:
-        if keyword in user_lower:
-            return False
-    
-    # If response is very short and doesn't contain negation, assume confirmation
-    if len(user_lower.split()) <= 3:
-        return True
-    
-    return False
-
