@@ -72,7 +72,7 @@ def call_gemini_api(question: str, context_articles: List[Tuple[int, str, float]
             ])
             
             prompt = f"""You are a news podcast host. Based on the following relevant news articles, create an engaging podcast-style response to the user's question. 
-            Please limit the podcast generation to one minute at maximum.  
+            Please limit the podcast generation to two minutes at maximum.  
 
 RELEVANT NEWS ARTICLES:
 {context_text}
@@ -80,15 +80,15 @@ RELEVANT NEWS ARTICLES:
 USER QUESTION: {question}
 
 Please create a podcast-style response that:
-1. Starts with a warm, engaging introduction
+1. Starts with a warm, engaging introduction that would make sense if your response had no other conversational context
 2. Directly addresses the user's question using information from the articles
 3. Weaves together insights from the relevant news articles
 4. Maintains a conversational, podcast-like tone
-5. Ends with a thoughtful conclusion
+5. Ends with a thoughtful conclusion that encourages the user to ask a follow-up question about the podcast-style response you generated
 
 If the articles don't contain enough information to fully answer the question, acknowledge this and provide what insights you can while being transparent about limitations.
 
-Format your response as if you're speaking directly to the listener in a podcast episode."""
+Format your response as if you are a news podcast host and user who provided the question is one of your listeners. Do not address the user directly, but rather address the listener as if they are one of your listeners."""
         else:
             prompt = f"""You are a news podcast host. The user has asked: "{question}"
 

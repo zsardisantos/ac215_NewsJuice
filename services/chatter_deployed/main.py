@@ -86,21 +86,48 @@ async def healthz_root() -> Dict[str, bool]:
 # --------------------------
 async def _retrieve_and_generate_podcast(
     websocket: WebSocket,
-    query_text: str,
+    enhanced_queries: Dict[str, str],
+    original_query: str,
     user_id: Optional[str],
     model: GenerativeModel
 ):
     """Helper function to retrieve chunks and generate podcast - used by both normal flow and query enhancement."""
-    #step2: call the retriever using the query text
+    #step2: call the retriever for each enhanced sub-query
     await websocket.send_json({"status": "retrieving"})
-    chunks = call_retriever_service(query_text)
+    all_chunks = []
     
-    if not chunks:
+    # Extract all enhanced_query_N keys and sort them
+    query_keys = sorted([k for k in enhanced_queries.keys() if k.startswith("enhanced_query_")])
+    
+    
+    for query_key in query_keys:
+        sub_query = enhanced_queries[query_key]
+        print(f"[retriever] Running retrieval for sub-query: {sub_query[:50]}...")
+        chunks = call_retriever_service(sub_query)
+        if chunks:
+            all_chunks.extend(chunks)
+    
+    # Remove duplicates based on chunk ID (keep first occurrence)
+    seen_ids = set()
+    unique_chunks = []
+    for chunk in all_chunks:
+        chunk_id = chunk[0]  # First element is the ID
+        if chunk_id not in seen_ids:
+            seen_ids.add(chunk_id)
+            unique_chunks.append(chunk)
+    
+    all_chunks = unique_chunks
+    
+    if not all_chunks:
         await websocket.send_json({"warning": "No relevant articles found"})
     
-    #step 3: call_gemini_api to generate podcast text
+    #step 3: call_gemini_api to generate podcast text with all combined chunks
     await websocket.send_json({"status": "generating"})
-    podcast_text, error = call_gemini_api(query_text, chunks, model)
+    
+    # Combine all enhanced sub-queries for podcast generation
+    combined_enhanced_query = "\n".join([enhanced_queries[k] for k in query_keys])
+
+    podcast_text, error = call_gemini_api(combined_enhanced_query, all_chunks, model)
     
     if error or not podcast_text:
         await websocket.send_json({"error": f"LLM error: {error}"})
@@ -124,7 +151,7 @@ async def _retrieve_and_generate_podcast(
         if user_id:
             save_audio_history(
                 user_id=user_id,
-                question_text=query_text,
+                question_text=original_query,
                 podcast_text=podcast_text,
                 audio_url=None
             )
@@ -251,17 +278,22 @@ async def websocket_chatter(websocket: WebSocket):
                             
                             # Enhance the query once
                             enhancement_result, error = enhance_query_with_gemini(text, model)
+                            original_query = text  # Keep original for podcast generation
                             
                             if error or not enhancement_result:
                                 print(f"[websocket] Query enhancement error: {error}, using original query")
-                                # Use original query if enhancement fails
+                                # Use original query as single sub-query if enhancement fails
+                                enhanced_queries = {"enhanced_query_1": text}
                             else:
-                                enhanced_query = enhancement_result.get("enhanced_query", text)
-                                text = enhanced_query
-                                print(f"[websocket] Query enhanced: {text}")
+                                # Extract all enhanced_query_N keys from the result
+                                enhanced_queries = {k: v for k, v in enhancement_result.items() if k.startswith("enhanced_query_")}
+                                if not enhanced_queries:
+                                    # Fallback if format is unexpected
+                                    enhanced_queries = {"enhanced_query_1": enhancement_result.get("enhanced_query", text)}
+                                print(f"[websocket] Query enhanced into {len(enhanced_queries)} sub-queries")
                             
                             # Use the helper function to retrieve and generate podcast
-                            success = await _retrieve_and_generate_podcast(websocket, text, user_id, model)
+                            success = await _retrieve_and_generate_podcast(websocket, enhanced_queries, original_query, user_id, model)
                             
                             if not success:
                                 audio_buffer.clear()

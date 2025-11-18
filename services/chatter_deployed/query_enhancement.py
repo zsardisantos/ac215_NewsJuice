@@ -62,12 +62,15 @@ def parse_gemini_response(response_text: str) -> Optional[Dict[str, str]]:
         # Parse the JSON
         result = json.loads(json_str)
         
-        # Validate required fields (clarification_question is optional now)
-        if all(key in result for key in ["original_query", "enhanced_query"]):
-            return result
-        else:
-            print(f"[query-enhancement-error] Missing required fields in response: {result}")
-            return None
+        # Validate required fields: must have original_query and at least one enhanced_query_N
+        if "original_query" in result:
+            # Check if there's at least one enhanced_query_N key
+            has_enhanced_query = any(k.startswith("enhanced_query_") for k in result.keys())
+            if has_enhanced_query:
+                return result
+        
+        print(f"[query-enhancement-error] Missing required fields in response: {result}")
+        return None
     except json.JSONDecodeError as e:
         print(f"[query-enhancement-error] Failed to parse JSON from response: {e}")
         print(f"[query-enhancement-error] Response text: {response_text[:200]}...")
