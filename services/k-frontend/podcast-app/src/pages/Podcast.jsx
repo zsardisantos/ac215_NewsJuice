@@ -291,50 +291,110 @@ function Podcast() {
     }
   }
 
-  // Stop recording
-  const stopRecording = () => {
-    console.log("[recording] Stopping recording...")
+  // [Z] below is the old Stop recording function; implementing new functionality
+  // // Stop recording
+  // const stopRecording = () => {
+  //   console.log("[recording] Stopping recording...")
     
-    // Wait a bit to ensure last chunks are sent before stopping
-    setTimeout(() => {
-      // Stop the recording flag (ref) to stop sending new chunks
-      isRecordingRef.current = false
+  //   // Wait a bit to ensure last chunks are sent before stopping
+  //   setTimeout(() => {
+  //     // Stop the recording flag (ref) to stop sending new chunks
+  //     isRecordingRef.current = false
       
-      // Wait a bit more for any in-flight chunks to be sent
-      setTimeout(() => {
-        // Disconnect processor to stop audio capture
-        if (processorRef.current) {
-          processorRef.current.disconnect()
-          processorRef.current = null
-        }
+  //     // Wait a bit more for any in-flight chunks to be sent
+  //     setTimeout(() => {
+  //       // Disconnect processor to stop audio capture
+  //       if (processorRef.current) {
+  //         processorRef.current.disconnect()
+  //         processorRef.current = null
+  //       }
 
-        // Stop media stream
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach(track => track.stop())
-          mediaStreamRef.current = null
-        }
+  //       // Stop media stream
+  //       if (mediaStreamRef.current) {
+  //         mediaStreamRef.current.getTracks().forEach(track => track.stop())
+  //         mediaStreamRef.current = null
+  //       }
 
-        // Close audio context
-        if (audioContextRef.current) {
-          audioContextRef.current.close()
-          audioContextRef.current = null
-        }
+  //       // Close audio context
+  //       if (audioContextRef.current) {
+  //         audioContextRef.current.close()
+  //         audioContextRef.current = null
+  //       }
 
-        // Update UI state
-        setIsRecording(false)
+  //       // Update UI state
+  //       setIsRecording(false)
 
-        // Send complete signal to backend
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          console.log("[recording] Sending complete signal to backend")
-          wsRef.current.send(JSON.stringify({ type: "complete" }))
-          setStatusMessage("Processing...")
-        } else {
-          console.error("[recording] WebSocket not ready! State:", wsRef.current?.readyState)
-          setStatusMessage("Error: Connection not ready")
-        }
-      }, 200) // Additional delay for in-flight chunks
-    }, 200) // Initial delay before stopping recording flag
-  }
+  //       // Send complete signal to backend
+  //       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+  //         console.log("[recording] Sending complete signal to backend")
+  //         wsRef.current.send(JSON.stringify({ type: "complete" }))
+  //         setStatusMessage("Processing...")
+  //       } else {
+  //         console.error("[recording] WebSocket not ready! State:", wsRef.current?.readyState)
+  //         setStatusMessage("Error: Connection not ready")
+  //       }
+  //     }, 200) // Additional delay for in-flight chunks
+  //   }, 200) // Initial delay before stopping recording flag
+  // }
+
+  // [Z] new stop recording functionality
+  const stopRecording = () => {
+  console.log("[recording] Stopping recording...")
+  
+  // IMPORTANT: Set ref to false immediately so next startRecording() can proceed
+  isRecordingRef.current = false
+  
+  // Wait a bit to ensure last chunks are sent before disconnecting audio
+  setTimeout(() => {
+    // Disconnect processor to stop audio capture
+    if (processorRef.current) {
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+
+    // Stop media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current = null
+    }
+
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+
+    // Update UI state
+    setIsRecording(false)
+
+    // Send complete signal to backend ONLY if WebSocket is open
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log("[recording] Sending complete signal to backend")
+      wsRef.current.send(JSON.stringify({ type: "complete" }))
+      setStatusMessage("Processing...")
+    } else {
+      // WebSocket not ready - this might happen if you released the button too quickly
+      console.warn("[recording] WebSocket not ready (state:", wsRef.current?.readyState, "), cannot send complete signal")
+      
+      // If there's no WebSocket or it's closed, reset to listening state
+      if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+        setStatusMessage("Go ahead, I'm listening")
+      } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
+        // Still connecting - wait for it to open, then send complete signal
+        setStatusMessage("Connecting...")
+        const originalWs = wsRef.current
+        
+        originalWs.addEventListener('open', () => {
+          if (wsRef.current === originalWs && originalWs.readyState === WebSocket.OPEN) {
+            console.log("[recording] WebSocket opened after delay, sending complete signal")
+            originalWs.send(JSON.stringify({ type: "complete" }))
+            setStatusMessage("Processing...")
+          }
+        }, { once: true })
+      }
+    }
+  }, 200) // Single delay for cleanup
+}
 
   // Stop playback
   const stopPlayback = () => {
@@ -511,10 +571,7 @@ function Podcast() {
             </motion.button>
 
             <motion.button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
+              onClick={handleCallButton}
               whileTap={{ scale: 0.95 }}
               className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${
                 isRecording
@@ -535,7 +592,7 @@ function Podcast() {
 
           {/* Instructions */}
           <div className="mt-8 text-center text-gray-500 text-sm max-w-md">
-            <p>Press and hold the call button to speak, release to hear AI response</p>
+            <p>Click the call button to start recording, click again to send</p>
           </div>
         </div>
 

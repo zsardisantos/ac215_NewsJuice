@@ -38,7 +38,7 @@ from typing import List, Tuple, Optional
 #DB_URL = os.environ["DATABASE_URL"]
 #DB_URL = os.environ.get("DATABASE_URL",
 #    "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:us-central1:newsdb-instance")
-DB_URL = os.environ.get("DATABASE_URL")
+DB_URL = os.environ.get("DATABASE_URL") # [Z] for any script trying to access our GCP DB, assuming we have to specify the path
 if not DB_URL:
     # Fallback for Cloud Run
     DB_URL = "postgresql://postgres:Newsjuice25+@/newsdb?host=/cloudsql/newsjuice-123456:us-central1:newsdb-instance"
@@ -76,15 +76,15 @@ class VertexEmbeddings:
             raise RuntimeError("Need to set GOOGLE_CLOUD_PROJECT")
         # Uses ADC via GOOGLE_APPLICATION_CREDENTIALS or gcloud
         self.client = genai.Client(vertexai=True, project=project, location=location)
-        self.model = EMBEDDING_MODEL
-        self.dim = EMBEDDING_DIM
+        self.model = EMBEDDING_MODEL #[Z] initialize embedding model, text-embedding-004 from VertexAI
+        self.dim = EMBEDDING_DIM #[Z] embedding dim is 768
         # ============== CHANGE 2: LOG INITIALIZATION ==============
         logger.info(f"VertexEmbeddings initialized - Project: {project}, Location: {location}, Model: {self.model}, Dim: {self.dim}")
         # ==========================================================
 
     def _embed_one(self, text: str) -> List[float]:
         resp = self.client.models.embed_content(
-            model=self.model,
+            model=self.model, 
             contents=[text],  # one at a time to avoid 20k token limit
             config=types.EmbedContentConfig(output_dimensionality=self.dim),
         )

@@ -16,8 +16,6 @@ if os.path.exists('.env'):
     from dotenv import load_dotenv
     load_dotenv()
 
-
-
 print(f"[retriever-debug] DATABASE_URL = {os.getenv('DATABASE_URL')}")
 
 VECTOR_TABLE_NAME = "chunks_vector"

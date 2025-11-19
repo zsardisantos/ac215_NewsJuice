@@ -22,12 +22,22 @@ def initialize_firebase_admin():
     
     # service account JSON file for the local development
     # [CM] strange that his works? the path in .env.local seems a dummy
-    service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
-    if service_account_path and os.path.exists(service_account_path):
-        cred = credentials.Certificate(service_account_path)
-        firebase_admin.initialize_app(cred)
-        print("[firebase-admin] Initialized with service account file")
-        return
+    # [Z] we do not need this code below, it works because when the backend
+    # is deployed on Cloud Run, we do not use the 
+    # service account (which is a dummy path), 
+    # so the Firebase falls back on the Application Default Credentials (ADC) 
+    # AKA the firebase service account file inside our GCP IAM
+    # service accounts folder
+    # that is what the firebase_admin.initialize_app() does.
+    
+    
+    
+    # service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
+    # if service_account_path and os.path.exists(service_account_path):
+    #     cred = credentials.Certificate(service_account_path)
+    #     firebase_admin.initialize_app(cred)
+    #     print("[firebase-admin] Initialized with service account file")
+    #     return
    
     # this is firebase authorization for the cloud deployment
     try:

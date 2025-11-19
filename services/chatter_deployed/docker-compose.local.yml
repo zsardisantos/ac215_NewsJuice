@@ -22,8 +22,8 @@ services:
   api:
     build: 
       context: .
-      args:
-        HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
+      #args:
+        #HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
     env_file:
       - .env.local  # Use .env.local for local development
     ports:
@@ -59,7 +59,7 @@ services:
       - PORT=8080
       
       # Model path (baked into image)
-      - SENTENCE_MODEL_PATH=/app/models/all-mpnet-base-v2
+      #- SENTENCE_MODEL_PATH=/app/models/all-mpnet-base-v2
     
     volumes:
       # Mount service account keys (read-only)

@@ -1,9 +1,5 @@
 """Speech-to-Text client for converting audio bytes to text.
 
-This replaces live_api_client.py and uses Google Cloud Speech-to-Text API
-for reliable batch transcription of audio.
-
-
 FUNCTIONS CONTAINED:
 
 async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
@@ -58,13 +54,14 @@ async def audio_to_text(audio_bytes: bytes) -> Optional[str]:
 async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
     """Transcribe the audio from frontend using the Google Speech to Text API."""
     try:
+        # [Z]
         #initialize the client, which uses GOOGLE_APPLICATION_CREDENTIALS from env
         client = speech.SpeechClient()
         
         # create the audio object. This wraps raw audio bytes into a RecognitionAudio object for the Google
         # Cloud Speech-to-Text. Tells the API the audio data to transcribe.
         audio = speech.RecognitionAudio(content=audio_bytes)
-        
+        #[Z]
         # have to try multiple sample rates in case there is something funky from the frontend
         #but usually audio streamed from a browser is 44100 Hz
         #sample rate is how many audio samples per second, so higher = better quality, larger files. It's like frames per second.
@@ -87,25 +84,28 @@ async def _transcribe_with_google_speech(audio_bytes: bytes) -> Optional[str]:
             print(f"[speech-to-text] Trying sample rate: {sample_rate} Hz...")
             
             try:
+                #[Z]
                 # Perform transcription
-                #.recognize is what the Google Cloud Speech  to Text API uses to understand audio, in order for transcription
+                #recognize is what the Google Cloud Speech  to Text API uses to understand audio, in order for transcription
                 response = client.recognize(config=config, audio=audio)
+                #response is essentially one giant dictionary that contaisn the 
+                #speech to text transcription version : degree of confidence model has that that is the ground truth transcription
         
                 # Debug: Print full response
                 print(f"[speech-to-text] Response received: {len(response.results)} results")
-                
+                #[Z]
                 # Here we actually transcript the text in the event the response is recognized.
                 #processes phrase/sentence segments (response.results is multiple transcription segments)
                 #alternatives[0] = best interpretation of that segment. alternatives is a list of potential phrases
                 #the given audio segment could be. confidence reflects confidence for entire segment.
                 transcript_parts = []
                 for i, result in enumerate(response.results):
-                    if result.alternatives:
-                        transcript_text = result.alternatives[0].transcript
+                    if result.alternatives: #result is a specific SEGMENT of the transcription. results[0] is the first phrase of audio --> "Hello Newsjuice"
+                        transcript_text = result.alternatives[0].transcript #Result alternatives are different interpretations of the same segment
                         confidence = result.alternatives[0].confidence if hasattr(result.alternatives[0], 'confidence') else None
                         print(f"[speech-to-text] Result {i}: '{transcript_text}' (confidence: {confidence})")
                         if transcript_text.strip():  # Only add non-empty transcripts
-                            transcript_parts.append(transcript_text)
+                            transcript_parts.append(transcript_text)  #we only add the greatest confidence segment to our transcription
                 
                 transcript = " ".join(transcript_parts)
                 

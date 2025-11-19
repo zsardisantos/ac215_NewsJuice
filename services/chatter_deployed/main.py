@@ -5,13 +5,27 @@ main.py
 
 Main app file for chatter service as a FastAPI
 
-Endpoints:
+ENDPOINTS CONTAINED:
 
-* /healthz
+@app.get("/healthz")
 For checking whether the app works
 
-* /api/chatter
+@app.post("/api/chatter")
 Main chatter endpoint: calls the chatter() function.
+
+@app.websocket("/ws/chat") 
+
+@app.post("/api/user/create")
+
+@app.get("/api/user/preferences")
+
+@app.post("/api/user/preferences")
+
+@app.get("/api/user/history")
+
+class FirebaseAuthMiddleware(BaseHTTPMiddleware):
+
+
 
 '''
 
@@ -22,7 +36,7 @@ load_dotenv()
 
 import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 #uploadfile handels audio file auploads from frontend
 from fastapi import FastAPI, Body, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse #streaming response stream audio chunks back to frontend
@@ -39,14 +53,18 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, HTTPException
 from user_db import create_user, get_user_preferences, save_user_preferences, save_audio_history, get_audio_history
 
-#importing helper functions
-from chatter_handler import chatter
+#importing helper functions 
+# from chatter_handler import chatter [Z] we do not need the chatter_handler.py script
 from helpers import call_retriever_service, call_gemini_api
 from chatter_handler import model
 from openai import OpenAI
 from query_enhancement import enhance_query_with_gemini
 from vertexai.generative_models import GenerativeModel 
 
+from query_enhancement import enhance_query_with_gemini
+# from chatter_handler import model
+# from openai import OpenAI [Z] we do not use OpenAI 
+from vertexai.generative_models import GenerativeModel #[Z] initialize Gemini model instance
 
 
 
@@ -54,6 +72,17 @@ from vertexai.generative_models import GenerativeModel
 # Config
 # --------------------------
 ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://www.newsjuiceapp.com").split(",")
+
+# --------------------------
+# Gemini Config
+# --------------------------
+GEMINI_SERVICE_ACCOUNT_PATH = os.environ.get(
+    "GEMINI_SERVICE_ACCOUNT_PATH",
+    "/secrets/gemini-service-account.json"
+)
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "newsjuice-123456")
+GOOGLE_CLOUD_REGION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
+
 # --------------------------
 # App / Clients
 # --------------------------
@@ -75,6 +104,24 @@ except Exception as e:
 
 
 # --------------------------
+# Initialize Gemini Modek
+# --------------------------
+try:
+    if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
+        #set credentials file path for Vertex AI
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GEMINI_SERVICE_ACCOUNT_PATH
+
+        #initialize model
+        model = GenerativeModel(
+            model_name=f'projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_REGION}/publishers/google/models/gemini-2.5-flash'
+        )
+    else: 
+        model = None
+except Exception as e:
+    print(f"[gemini-error] Failed to configure service account: {e}")
+    model = None
+
+# --------------------------
 # Health
 # --------------------------
 @app.get("/healthz")
@@ -84,29 +131,34 @@ async def healthz_root() -> Dict[str, bool]:
 # --------------------------
 # Helper Functions
 # --------------------------
+#[Z] 
 async def _retrieve_and_generate_podcast(
     websocket: WebSocket,
-    enhanced_queries: Dict[str, str],
-    original_query: str,
+    enhanced_queries: Dict[str, str], #dictionary w/ string keys and stringvalues, which are each enhanced query
+    original_query: str, 
     user_id: Optional[str],
     model: GenerativeModel
 ):
     """Helper function to retrieve chunks and generate podcast - used by both normal flow and query enhancement."""
-    #step2: call the retriever for each enhanced sub-query
+    #step2: call the retriever for each enhanced sub-query (if it exists)
     await websocket.send_json({"status": "retrieving"})
     all_chunks = []
-    
+
     # Extract all enhanced_query_N keys and sort them
     query_keys = sorted([k for k in enhanced_queries.keys() if k.startswith("enhanced_query_")])
-    
-    
+
+#[Z] assuming here that for each sub query, we run the cosine similarity of the db and pull relevant chunks
     for query_key in query_keys:
         sub_query = enhanced_queries[query_key]
         print(f"[retriever] Running retrieval for sub-query: {sub_query[:50]}...")
         chunks = call_retriever_service(sub_query)
         if chunks:
+            # Print each chunk with its similarity score
+            print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
+            for i, (chunk_id, chunk_text, score) in enumerate(chunks):
+                print(f"  Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:100]}...")
             all_chunks.extend(chunks)
-    
+
     # Remove duplicates based on chunk ID (keep first occurrence)
     seen_ids = set()
     unique_chunks = []
@@ -115,38 +167,43 @@ async def _retrieve_and_generate_podcast(
         if chunk_id not in seen_ids:
             seen_ids.add(chunk_id)
             unique_chunks.append(chunk)
-    
+    # makes sense to only have the unique chunks for all enhanced queries
     all_chunks = unique_chunks
-    
+
+    # Print summary of final unique chunks
+    print(f"[retriever] After deduplication: {len(all_chunks)} unique chunks")
+    for i, (chunk_id, chunk_text, score) in enumerate(all_chunks):
+        print(f"  Final Chunk {i+1} (ID: {chunk_id}, Score: {score:.4f}): {chunk_text[:150]}...")
+
     if not all_chunks:
         await websocket.send_json({"warning": "No relevant articles found"})
-    
+
     #step 3: call_gemini_api to generate podcast text with all combined chunks
     await websocket.send_json({"status": "generating"})
-    
+    #[Z] assuming we combine all these chunks + sub-queries for the podcast generation
     # Combine all enhanced sub-queries for podcast generation
     combined_enhanced_query = "\n".join([enhanced_queries[k] for k in query_keys])
 
     podcast_text, error = call_gemini_api(combined_enhanced_query, all_chunks, model)
-    
+
     if error or not podcast_text:
         await websocket.send_json({"error": f"LLM error: {error}"})
         return False
-    
+
     await websocket.send_json({"status": "podcast_generated", "text": podcast_text})
-    
+
     #step4: convert podcast text to audio
     await websocket.send_json({"status": "converting_to_audio"})
     try:
         await websocket.send_json({"status": "streaming_audio"})
         result = await text_to_audio_stream(podcast_text, websocket)
-        
+
         if not result:
             await websocket.send_json({"error": "Failed to generate audio stream"})
             return False
-        
+
         await websocket.send_json({"status": "complete"})
-        
+
         # Save audio history if user is authenticated
         if user_id:
             save_audio_history(
@@ -156,11 +213,11 @@ async def _retrieve_and_generate_podcast(
                 audio_url=None
             )
             print(f"[websocket] Audio history saved for user: {user_id}")
-    
+
     except Exception as e:
         await websocket.send_json({"error": f"TTS failed: {str(e)}"})
         return False
-    
+
     return True
 
 #------------
@@ -201,20 +258,26 @@ async def websocket_chatter(websocket: WebSocket):
     # - Save audio history with user_id
     # - Load user preferences with user_id
     
-    audio_buffer = bytearray()
-    tts_client = OpenAI()  # Initialize once, reuse in loop
-    is_processing = False  # Track if we're currently processing a request
+    audio_buffer = bytearray() #bytearray data structure is what will hold our audio chunks
+    # tts_client = OpenAI()  # Initialize once, reuse in loop
+    is_processing = False  # what this is checking is that the backend is already transcribing/generating a response
 
+    
     try: 
         while True:
             #receive audio chunks from frontend
             # data = await websocket.receive_bytes()
             #OR if frontedn sends JSON with audio data
             message = await websocket.receive()
-            if message["type"] == "websocket.receive":
-                # Handle raw audio bytes
+            #the way websocket works is via receiving messages. the backend
+            # waits to receive a message from the frontend
+            #it could be raw audio bytes, or a JSON message
+            if message["type"] == "websocket.receive": #this is the backend confirming
+                #it is a receive event from the frontend
+
+                # handle raw audio bytes
                 if "bytes" in message:
-                    # If we're processing a previous request, ignore new audio chunks
+                    # if we're processing a previous request, ignore new audio chunks. avoid overstuffing the audio bujffer
                     if is_processing:
                         print(f"[websocket] Ignoring audio chunk - still processing previous request")
                         continue
@@ -246,13 +309,14 @@ async def websocket_chatter(websocket: WebSocket):
                             print(f"[websocket] Received complete signal, audio buffer size: {len(audio_buffer)} bytes")
                             
                             # Step 1: Convert audio to text
-                            await websocket.send_json({"status": "transcribing"})
-                            print("[websocket] Starting transcription...")
+                            await websocket.send_json({"status": "transcribing"}) # send.json sends a JSON message from backend to frontend
+                            #via frontend connection
+                            print("[websocket] Starting transcription...") #backend status print
                             
                             try:
                                 #audio_to_text again is the speech_to_text_client.py file, that converts our frontend
                                 #audio to text. the transcribed text is the output from audio_to_text.
-                                text = await audio_to_text(bytes(audio_buffer))
+                                text = await audio_to_text(bytes(audio_buffer)) #and we feed audio_buffer, our chunks of audio, into the function as input
                                 #I think this is what shows up in the backend terminal once the transcription is complete
                                 #so we can monitor progress
                                 print(f"[websocket] Transcription complete, text: {text[:100] if text else 'None'}...")
@@ -271,15 +335,15 @@ async def websocket_chatter(websocket: WebSocket):
                             #websocket.send_json updates the frontend, status message via websocket
                             #frontend receives this and updates the UI
                             await websocket.send_json({"status": "transcribed", "text": text})
-                            
+
                             # NEW STEP: Query Enhancement - enhance query once and use it directly
                             await websocket.send_json({"status": "enhancing_query"})
                             print("[websocket] Enhancing query...")
-                            
+
                             # Enhance the query once
                             enhancement_result, error = enhance_query_with_gemini(text, model)
                             original_query = text  # Keep original for podcast generation
-                            
+
                             if error or not enhancement_result:
                                 print(f"[websocket] Query enhancement error: {error}, using original query")
                                 # Use original query as single sub-query if enhancement fails
@@ -291,10 +355,10 @@ async def websocket_chatter(websocket: WebSocket):
                                     # Fallback if format is unexpected
                                     enhanced_queries = {"enhanced_query_1": enhancement_result.get("enhanced_query", text)}
                                 print(f"[websocket] Query enhanced into {len(enhanced_queries)} sub-queries")
-                            
+
                             # Use the helper function to retrieve and generate podcast
                             success = await _retrieve_and_generate_podcast(websocket, enhanced_queries, original_query, user_id, model)
-                            
+
                             if not success:
                                 audio_buffer.clear()
                                 is_processing = False
@@ -338,9 +402,10 @@ async def websocket_chatter(websocket: WebSocket):
 # --------------------------
 # Main Endpoint
 # --------------------------
-@app.post("/api/chatter")
-async def chatter_endpoint(payload: Dict[str, Any] = Body(...)):
-    return await chatter(payload)
+# [Z] we do not need this /api/chatter endpoint  
+# @app.post("/api/chatter")
+# async def chatter_endpoint(payload: Dict[str, Any] = Body(...)):
+#     return await chatter(payload)
 
 
 # ----------------------
