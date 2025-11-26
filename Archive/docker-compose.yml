@@ -1,0 +1,98 @@
+services:
+  # Step 1 — extractor: writes /data/news.jsonl then exits 0
+  scraper:
+    build: ./services/scraper
+    container_name: scraper
+    volumes:
+      - ./services/scraper:/app
+      - ./artifacts:/data #do we even need this anymore? 
+      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+    working_dir: /app
+    # change this to your actual extractor entrypoint
+    command:
+    - sh
+    - -lc
+    - exec /home/app/.venv/bin/python scrapers.py
+    restart: "no"
+
+  # Step 2 — loader: reads the /data/news.jsonl file, chunks, embeds and loads to vector DB
+  #perhaps we change the description of this? not reading json file anymore 
+  loader:
+    build: ./services/loader
+    depends_on:
+      - dbproxy
+    volumes:
+      - ./services/loader:/app
+      - ./artifacts:/data #again dont think we need 
+      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      DB_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb" #not sure we need this
+      #either because we gave the database url above 
+      GOOGLE_CLOUD_PROJECT: "newsjuice-123456" 
+      GOOGLE_CLOUD_REGION:  "us-central1"
+    working_dir: /app
+    #change this to your actual processor entrypoint
+    #command: ["python", "Vector_DB_query.py", "--in", "/data/news.jsonl"]
+    command:
+    - sh
+    - -lc
+    - >
+      /home/app/.venv/bin/python wait_for_db.py
+      && exec /home/app/.venv/bin/python loader.py --out /data/news.jsonl
+    restart: "no"
+
+# Step 3 — retriever: code is volume-mounted into chatter service
+  # retriever:  # Not run as standalone container - code mounted into chatter
+
+  # Step 4 — chatter: interactive chat service with Gemini API and TTS
+  chatter:
+    build: ./services/chatter
+    depends_on:
+      - dbproxy
+    volumes:
+      - ./services/chatter:/app
+      - ./services/retriever:/app/retriever
+      - ./services/tts:/app/tts
+      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
+      - ../secrets/gemini-service-account.json:/run/secrets/gemini-service-account.json:ro
+      - ./audio_output:/tmp/audio_output
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp.json
+      DATABASE_URL: "postgresql://postgres:Newsjuice25%2B@dbproxy:5432/newsdb"
+      GEMINI_SERVICE_ACCOUNT_PATH: /run/secrets/gemini-service-account.json
+      TTS_SERVICE_ACCOUNT_PATH: /run/secrets/gcp.json
+      GOOGLE_CLOUD_PROJECT: "newsjuice-123456"
+      GOOGLE_CLOUD_REGION: "us-central1"
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    command:
+    - sh
+    - -lc
+    - >
+      /home/app/.venv/bin/python wait_for_db.py
+      && exec /home/app/.venv/bin/python chatter.py
+    restart: "no"
+
+  # TTS service: code is volume-mounted into chatter service
+  # tts:  # Not run as standalone container - code mounted into chatter
+
+  # Cloud SQL Auth Proxy so the processor can reach your DB
+  dbproxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2
+    command:
+      - "--port=5432"
+      - "--address=0.0.0.0"
+      - "--credentials-file=/run/secrets/gcp.json"
+      - "newsjuice-123456:us-central1:newsdb-instance"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../secrets/gcp.json:/run/secrets/gcp.json:ro
+    restart: unless-stopped

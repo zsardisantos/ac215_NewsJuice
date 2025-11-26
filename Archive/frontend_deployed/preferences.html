@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+<title>NeswJuice-Preferences</title>
+
+</head>
+
+<body>
+
+<h1>Introduction of preferences</h1>
+
+    <form id="form">
+      <fieldset id="voice_type">
+        <legend>Voice Type</legend>
+        <label>
+          <input type="radio" name="voice" value="male" required>
+          Male
+        </label>
+        <label>
+          <input type="radio" name="voice" value="female">
+          Female
+        </label>
+      </fieldset>
+  
+      <fieldset id="pod_style">
+        <legend>Podcast Style</legend>
+        <label>
+          <input type="radio" name="style" value="interview" required>
+          Interview
+        </label>
+        <label>
+          <input type="radio" name="style" value="narrative">
+          Narrative
+        </label>
+      </fieldset>
+  
+      <button id="submit_btn" type="submit">SAVE</button>
+    </form>
+
+</body>
+
+</html>
+
+<script>
+
+    //Should work for production and local
+    const BACKEND_URL = window.location.hostname.includes('newsjuiceapp.com')
+      ? "https://chatter-919568151211.us-central1.run.app/api/chatter"
+      : "http://localhost:8080/api/chatter";
+
+
+    const form = document.getElementById("form");
+    const pod_style = document.getElementById("pod_style");
+    const voice_type = document.getElementById("voice_type");
+    const submit_btn = document.getElementById("submit_btn");
+    const result = document.getElementById("result");
+
+
+    const clearBtn = document.getElementById("clear");
+    const playerWrap = document.getElementById("playerWrap");
+    const player = document.getElementById("player");
+    const download = document.getElementById("download");
+
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const pstyle = pod_style.value;
+      const vtype = voice_type.value;
+      if (!pstyle || !vtype) {
+        result.textContent = "Please select both a voice type and a podcast style.";
+        return;
+        }
+
+
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vtype, pstyle })
+        });
+
+        if (!res.ok) throw new Error(await res.text().catch(()=>"Request failed"));
+
+        const data = await res.json();
+        console.log(data)
+
+        if (!data.signedUrl) throw new Error("No signed URL returned from server.");
+        result.textContent = "✅ Request sent successfully!";
+
+    } catch (err) {
+        console.error(err);
+        result.textContent = "❌ Error: " + (err.message || "Unknown error");
+    }
+    });

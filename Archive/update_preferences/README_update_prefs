@@ -1,0 +1,15 @@
+
+
+BACKEND endoint will get json:
+
+{
+  "vtype": "female",
+  "pstyle": "narrative"
+}
+
+BACKEND can then do
+
+data = await request.json()
+voice_type = data["vtype"]
+pod_style = data["pstyle"]
+

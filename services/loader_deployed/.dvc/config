@@ -1,0 +1,4 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = gs://newsjuice-data-versions-loader/dvc-storage

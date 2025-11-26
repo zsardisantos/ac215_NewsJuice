@@ -9,7 +9,7 @@ services:
       - "--port=5432"
       - "newsjuice-123456:us-central1:newsdb-instance"
     volumes:
-      - ./secrets/sa-key.json:/secrets/sa-key.json:ro
+      - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
     ports:
@@ -22,8 +22,10 @@ services:
   api:
     build: 
       context: .
-      args:
-        HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
+      #args:
+        #HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
+    env_file:
+      - .env.local  # Use .env.local for local development
     ports:
       - "8080:8080"
     depends_on:
@@ -34,7 +36,7 @@ services:
       - DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
       
       # OpenAI
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
       
       # Google Cloud
       - GOOGLE_CLOUD_PROJECT=newsjuice-123456
@@ -42,24 +44,27 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/sa-key.json
       - GEMINI_SERVICE_ACCOUNT_PATH=/secrets/gemini-service-account.json
       
+      # Google AI API (for Live API - loaded from .env.local via env_file)
+      
       # GCS
       - AUDIO_BUCKET=ac215-audio-bucket
       - GCS_PREFIX=podcasts/
       - CACHE_CONTROL=public, max-age=3600
       
       # CORS
-      - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000
+      # - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000
+      - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000,http://localhost:5173
       
       # Server
       - PORT=8080
       
       # Model path (baked into image)
-      - SENTENCE_MODEL_PATH=/app/models/all-mpnet-base-v2
+      #- SENTENCE_MODEL_PATH=/app/models/all-mpnet-base-v2
     
     volumes:
       # Mount service account keys (read-only)
-      - ../secrets/sa-key.json:/app/sa-key.json:ro
-      - ../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
+      - ../../../secrets/sa-key.json:/app/sa-key.json:ro
+      - ../../../secrets/gemini-service-account.json:/secrets/gemini-service-account.json:ro
       
       # Optional: Mount code for hot-reload during development
       # Uncomment these lines if you want to edit code without rebuilding

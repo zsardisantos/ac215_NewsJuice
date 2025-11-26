@@ -1,0 +1,36 @@
+# ---- Development Image ----
+FROM python:3.12-slim-bookworm AS dev
+
+ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT=/home/app/.venv
+ENV VIRTUAL_ENV=/home/app/.venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+ENV PORT=8080
+ENV DEV=1
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg \
+        build-essential \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip && pip install uv
+
+WORKDIR /app
+RUN mkdir -p /app/secrets
+
+# Copy dependency files
+COPY pyproject.toml uv.lock .flake8 ./
+
+# Install main + dev dependencies (Black, Flake8, pytest, pre-commit)
+RUN uv sync --extra dev
+
+# Copy app & test code
+COPY src/api-service/api/ ./api/
+COPY tests/ ./tests/
+COPY pytest.ini ./
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
+EXPOSE 8080
+ENTRYPOINT ["/bin/bash", "docker-entrypoint.sh"]

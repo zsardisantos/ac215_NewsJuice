@@ -1,0 +1,203 @@
+# .github/workflows/ci_combined.yaml
+name: CI - Combined Test Suite (All Services)
+
+on:
+  push:
+    paths:
+      - 'services/loader_testing/**'
+      - 'services/scraper_deployed/**'
+      - 'services/chatter_deployed/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'services/loader_testing/**'
+      - 'services/scraper_deployed/**'
+      - 'services/chatter_deployed/**'
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # LINT JOB - Code Quality Checks for All Services
+  # ============================================================
+  lint:
+    name: Lint All Services (Black + Flake8)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        run: pip install uv
+      
+      # Loader
+      - name: Install Loader dependencies
+        working-directory: services/loader_testing
+        run: uv sync --extra dev
+      
+      - name: Lint Loader
+        working-directory: services/loader_testing
+        run: |
+          uv run black --check src/api-service/api
+          uv run flake8 src/api-service/api
+      
+      # Scraper
+      - name: Install Scraper dependencies
+        working-directory: services/scraper_deployed
+        run: uv sync --extra dev
+      
+      - name: Lint Scraper
+        working-directory: services/scraper_deployed
+        run: |
+          uv run black --check *.py
+          uv run flake8 *.py
+      
+      # Chatter
+      - name: Install Chatter dependencies
+        working-directory: services/chatter_deployed
+        run: uv sync --extra dev
+      
+      - name: Lint Chatter
+        working-directory: services/chatter_deployed
+        run: |
+          uv run black --check *.py
+          uv run flake8 *.py
+
+  # ============================================================
+  # COMBINED TESTS - Run All Services, Merge Coverage
+  # ============================================================
+  combined-tests:
+    name: Combined Tests (All Services)
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv and coverage
+        run: |
+          pip install uv coverage
+      
+      - name: Create coverage directory
+        run: mkdir -p ${{ github.workspace }}/coverage
+      
+      # ---- LOADER TESTS ----
+      - name: Install Loader dependencies
+        working-directory: services/loader_testing
+        run: uv sync --extra dev
+      
+      - name: Run Loader unit tests
+        working-directory: services/loader_testing
+        env:
+          PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
+          COVERAGE_FILE: ${{ github.workspace }}/coverage/.coverage.loader
+        run: |
+          uv run coverage run --source=api -m pytest tests/unit/ -v --no-cov
+      
+      # ---- SCRAPER TESTS ----
+      - name: Install Scraper dependencies
+        working-directory: services/scraper_deployed
+        run: uv sync --extra dev
+      
+      - name: Install Playwright browsers
+        working-directory: services/scraper_deployed
+        run: |
+          uv run playwright install chromium
+          uv run playwright install-deps chromium
+      
+      - name: Run Scraper tests
+        working-directory: services/scraper_deployed
+        env:
+          DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
+          COVERAGE_FILE: ${{ github.workspace }}/coverage/.coverage.scraper
+        run: |
+          uv run coverage run --source=. -m pytest test/ -v --no-cov
+      
+      # ---- CHATTER TESTS ----
+      - name: Install Chatter dependencies
+        working-directory: services/chatter_deployed
+        run: uv sync --extra dev
+      
+      - name: Run Chatter tests
+        working-directory: services/chatter_deployed
+        env:
+          DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
+          COVERAGE_FILE: ${{ github.workspace }}/coverage/.coverage.chatter
+        run: |
+          uv run coverage run --source=. -m pytest tests/ -v --no-cov
+      
+      # ---- COMBINE COVERAGE ----
+      - name: Combine coverage reports
+        working-directory: ${{ github.workspace }}/coverage
+        run: |
+          coverage combine
+          coverage report --fail-under=50
+          coverage html -d htmlcov
+      
+      - name: Upload combined coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-coverage
+          path: ${{ github.workspace }}/coverage/htmlcov/
+
+  # ============================================================
+  # TEST SUMMARY
+  # ============================================================
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint, combined-tests]
+    if: always()
+    
+    steps:
+      - name: Display test results summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "           COMBINED TEST SUITE SUMMARY"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "  Lint:            ${{ needs.lint.result }}"
+          echo "  Combined Tests:  ${{ needs.combined-tests.result }}"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      
+      - name: Check for failures
+        run: |
+          if [[ "${{ needs.lint.result }}" == "failure" ]] || \
+             [[ "${{ needs.combined-tests.result }}" == "failure" ]]; then
+            echo ""
+            echo "COMBINED TEST SUITE FAILED - See job details above"
+            echo ""
+            exit 1
+          fi
+          
+          echo ""
+          echo "ALL TESTS PASSED!"
+          echo ""

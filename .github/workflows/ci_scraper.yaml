@@ -1,0 +1,123 @@
+# .github/workflows/ci_scraper.yaml
+name: CI - Scraper Test Suite
+
+on:
+  push:
+    paths:
+      - 'services/scraper_deployed/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'services/scraper_deployed/**'
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # LINT JOB - Code Quality Checks
+  # ============================================================
+  lint-scraper:
+    name: Lint Scraper (Black + Flake8)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/scraper_deployed
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --extra dev
+      
+      - name: Run Black formatting check
+        run: |
+          uv run black --check *.py
+      
+      - name: Run Flake8 linting
+        run: |
+          uv run flake8 *.py
+
+  # ============================================================
+  # UNIT TESTS - Fast, No External Dependencies
+  # ============================================================
+  unit-tests-scraper:
+    name: Scraper Unit Tests (Coverage >= 50%)
+    runs-on: ubuntu-latest
+    needs: lint-scraper
+    defaults:
+      run:
+        working-directory: services/scraper_deployed
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --extra dev
+      
+      - name: Install Playwright browsers
+        run: |
+          uv run playwright install chromium
+          uv run playwright install-deps chromium
+      
+      - name: Run unit tests with coverage
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/testdb
+        run: |
+          uv run pytest test/ -v --cov=. --cov-fail-under=50 --cov-report=term --cov-report=html
+      
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-test-coverage
+          path: services/scraper_deployed/htmlcov/
+
+  # ============================================================
+  # TEST SUMMARY - Aggregate Results
+  # ============================================================
+  test-summary-scraper:
+    name: Scraper Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint-scraper, unit-tests-scraper]
+    if: always()
+    
+    steps:
+      - name: Display test results summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "              SCRAPER TEST SUITE SUMMARY"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "  Lint:        ${{ needs.lint-scraper.result }}"
+          echo "  Unit Tests:  ${{ needs.unit-tests-scraper.result }}"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      
+      - name: Check for failures
+        run: |
+          if [[ "${{ needs.lint-scraper.result }}" == "failure" ]] || \
+             [[ "${{ needs.unit-tests-scraper.result }}" == "failure" ]]; then
+            echo ""
+            echo "SCRAPER TEST SUITE FAILED - See job details above"
+            echo ""
+            exit 1
+          fi
+          
+          echo ""
+          echo "ALL SCRAPER TESTS PASSED!"
+          echo ""

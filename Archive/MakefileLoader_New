@@ -1,0 +1,13 @@
+.PHONY: build_loader load up-proxy
+
+run: build_loader up-proxy load  ## Build images, start proxy, scrape articles, and load them into vector DB
+	@echo "✅ Loader process finished."
+
+build_loader:
+	docker compose build loader
+
+up-proxy:
+	docker compose up -d dbproxy
+
+load:
+	docker compose run --rm loader

@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NEWSJUICE – Text → Podcast</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --accent:#ffffff;
+      --accent-dim:rgba(255,255,255,.85);
+      --glass:rgba(255,255,255,.12);
+      --glass-strong:rgba(255,255,255,.22);
+      --shadow:0 10px 30px rgba(0,0,0,.25);
+      --radius:24px;
+    }
+    /* Page */
+    *{box-sizing:border-box}
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Helvetica Neue", sans-serif;
+      background: linear-gradient(135deg, #ff7e5f, #feb47b);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      text-align: center;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      padding: 2rem;
+    }
+
+    /* Card */
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: var(--glass);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2rem;
+      animation: floatIn .6s ease-out both;
+    }
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(8px) scale(.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Header */
+    .logo {
+      width: 96px;
+      height: 96px;
+      object-fit: cover;
+      border-radius: 20px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25);
+      margin: 0 auto 1rem;
+      display: block;
+    }
+    h1 {
+      font-size: clamp(2rem, 3vw + 1rem, 3rem);
+      letter-spacing: 2px;
+      margin: .25rem 0 .25rem;
+    }
+    .tagline{
+      font-size: 1.05rem;
+      color: var(--accent-dim);
+      margin-bottom: 1.5rem;
+    }
+    .pill {
+      display:inline-block;
+      font-weight: 700;
+      background: var(--glass-strong);
+      padding: .5rem 1rem;
+      border-radius: 999px;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Form */
+    .group{
+      text-align: left;
+    }
+    label{
+      display:block;
+      margin-bottom:.5rem;
+      font-size:.95rem;
+      color: var(--accent);
+      opacity:.9;
+    }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      resize: vertical;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 16px;
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      padding: 1rem 1.1rem;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+    }
+    textarea::placeholder{ color: rgba(255,255,255,.7); }
+    textarea:focus{
+      border-color: rgba(255,255,255,.8);
+      background: rgba(255,255,255,.12);
+      box-shadow: 0 0 0 4px rgba(255,255,255,.15);
+    }
+
+    .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:.75rem;
+      align-items:center;
+      justify-content:center;
+      margin-top:1rem;
+    }
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: .9rem 1.4rem;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing:.3px;
+      cursor: pointer;
+      color: #ff7e5f;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(0,0,0,.25);
+      transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
+    }
+    button:hover { box-shadow: 0 10px 26px rgba(0,0,0,.3); }
+    button:active { transform: translateY(1px) scale(.995); }
+    button:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
+
+    .secondary{
+      background: transparent;
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,.7);
+      box-shadow: none;
+      padding:.85rem 1.2rem;
+    }
+    .secondary:hover{
+      background: rgba(255,255,255,.12);
+      border-color: rgba(255,255,255,.95);
+    }
+
+    /* Result / player */
+    #result {
+      margin-top: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .player-wrap{
+      margin-top:1rem;
+      display:none;
+    }
+    audio{
+      width:100%;
+      max-width:100%;
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,.25));
+      border-radius: 12px;
+    }
+    .download{
+      display:none;
+      margin-top:.75rem;
+      text-decoration:none;
+      font-weight:700;
+      color:#fff;
+      border-bottom: 2px solid rgba(255,255,255,.7);
+      padding-bottom:2px;
+    }
+    .download:hover{ border-color:#fff; }
+
+    /* Footer hint */
+    .hint{
+      margin-top:1rem;
+      font-size:.9rem;
+      color: var(--accent-dim);
+    }
+    .sr-only{
+      position:absolute !important;
+      width:1px;height:1px;
+      padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+    }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="title">
+    <!-- Logo -->
+    <img src="logo.jpeg" alt="NEWSJUICE logo" class="logo" />
+
+    <!-- Headings -->
+    <div class="pill">🎧 Text → Podcast</div>
+    <h1 id="title">NEWSJUICE</h1>
+    <p class="tagline">Your daily dose of fresh, squeezed news — now as audio.</p>
+
+    <!-- Form -->
+    <form id="form" class="group" novalidate>
+      <label for="text">Paste or write the script</label>
+      <textarea id="text" placeholder="Type your text here..."></textarea>
+      <div id="audioSection" style="margin-top: 1rem; text-align: center;">
+        <button id="recordBtn" type="button" class="secondary">🎤 Start Recording</button>
+        <button id="stopBtn" type="button" class="secondary" style="display: none; margin-left: 0.5rem;">⏹️ Stop & Send</button>
+        <div id="audioStatus" style="margin-top: 0.5rem; font-size: 0.9rem; min-height: 1.5rem;"></div>
+      </div>
+      <div class="actions">
+        <button id="btn" type="submit">Create & Play</button>
+        <button id="clear" type="button" class="secondary">Clear</button>
+      </div>
+    </form>
+
+    <!-- Status -->
+    <div id="result" role="status" aria-live="polite"></div>
+
+    <!-- Player -->
+    <div class="player-wrap" id="playerWrap">
+      <audio id="player" controls preload="none"></audio>
+      <a id="download" class="download" download="podcast.mp3">Download MP3</a>
+    </div>
+
+    <p class="hint">Pro tip: keep it concise for snappier audio.</p>
+  </main>
+
+  <script>
+    // previously: 
+    //const BACKEND_URL = "https://chatter-919568151211.us-central1.run.app/api/chatter"; // ← replace with your FastAPI endpoint
+    // const BACKEND_URL = "http://localhost:8080/api/chatter"; /* for local testing*/
+  
+    //New - should work for production and local
+    const BACKEND_URL = window.location.hostname.includes('newsjuiceapp.com')
+      ? "https://chatter-919568151211.us-central1.run.app/api/chatter"
+      : "http://localhost:8080/api/chatter";
+    
+    const WS_URL = window.location.hostname.includes('newsjuiceapp.com')
+    ? "wss://chatter-919568151211.us-central1.run.app/ws/chat"
+    : "ws://localhost:8080/ws/chat";
+    //ws:// for local, wss:// for https sites. This is website protocol for real-time bidirectional communication
+    //set up audio recording variables 
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioContext = null;
+    let mediaStream = null;
+    let ws = null;  // WebSocket connection
+    let isRecording = false;
+    //This function conencts on a page load or when recording starts
+    function connectWebSocket(){
+      return new Promise((resolve, reject) => {
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+        console.log("[ws] Connected");
+        resolve();
+        };
+        ws.onerror = (error) => {
+          console.error("[ws] Error:", error);
+          reject(error);
+        };
+        
+        ws.onclose = () => {
+          console.log("[ws] Disconnected");
+          ws = null;
+        };
+          ws.onmessage = async (event) => {
+            if (event.data instanceof Blob) {
+        // Received audio bytes
+              handleAudioChunk(event.data);
+            } else {
+              // Received JSON status message
+              const data = JSON.parse(event.data);
+              handleStatusMessage(data);
+            }
+        };
+      });
+    }
+        function handleStatusMessage(data) {
+      const status = data.status;
+      const audioStatus = document.getElementById("audioStatus");
+      
+      switch(status) {
+        case "chunk_received":
+          // Backend received audio chunk
+          break;
+          
+        case "transcribing":
+          audioStatus.textContent = "🎤 Transcribing your voice...";
+          break;
+          
+        case "transcribed":
+          audioStatus.textContent = `✅ Transcribed: "${data.text}"`;
+          break;
+          
+        case "retrieving":
+          audioStatus.textContent = "🔍 Finding relevant news articles...";
+          break;
+          
+        case "generating":
+          audioStatus.textContent = "✨ Generating podcast response...";
+          break;
+          
+        case "podcast_generated":
+          audioStatus.textContent = "📝 Podcast text ready!";
+          break;
+          
+        case "converting_to_audio":
+          audioStatus.textContent = "🔊 Converting to audio...";
+          break;
+          
+        case "streaming_audio":
+          audioStatus.textContent = "📡 Receiving audio stream...";
+          resetMedia(); // Clear previous audio
+          break;
+          
+        case "complete":
+          audioStatus.textContent = "✅ Complete! Playing podcast...";
+          finalizeAudio(); // Create blob and play when streaming is complete
+          break;
+          
+        case "error":
+          audioStatus.textContent = `❌ Error: ${data.error}`;
+          setBusy(false, "");
+          // Reset recording state if error occurs
+          if (isRecording) {
+            stopRecording();
+          }
+          break;
+          
+        default:
+          console.log("[ws] Status:", data);
+      }
+    }
+
+//function to handle audio chunks from backend! 
+    let audioBuffer = [];
+    let audioBlob = null;
+    let isStreamingAudio = false;
+
+    function handleAudioChunk(chunk) {
+      if (!isStreamingAudio) {
+        console.log("[audio] Starting to accumulate audio chunks");
+        isStreamingAudio = true;
+      }
+      
+      // Accumulate audio chunks (don't create blob yet - wait for complete signal)
+      audioBuffer.push(chunk);
+      console.log(`[audio] Accumulated ${audioBuffer.length} chunks (${chunk.size} bytes this chunk)`);
+    }
+    
+    function finalizeAudio() {
+      if (audioBuffer.length === 0) {
+        console.warn("[audio] No audio chunks to finalize");
+        return;
+      }
+      
+      console.log(`[audio] Finalizing audio: ${audioBuffer.length} chunks`);
+      
+      // Backend now sends WAV format, so use audio/wav
+      const mimeTypes = ['audio/wav', 'audio/wave', 'audio/x-wav'];
+      
+      for (const mimeType of mimeTypes) {
+        try {
+          audioBlob = new Blob(audioBuffer, { type: mimeType });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
+          // Update audio player
+          player.src = audioUrl;
+          playerWrap.style.display = "block";
+          
+          console.log(`[audio] Created audio blob with type: ${mimeType}`);
+          
+          // Auto-play when ready
+          player.oncanplay = () => {
+            console.log("[audio] Audio can play, attempting autoplay");
+            player.play().catch((err) => {
+              console.warn("[audio] Autoplay blocked:", err);
+            });
+          };
+          
+          player.onerror = (e) => {
+            console.error(`[audio] Error playing audio with ${mimeType}:`, e);
+            // Try next format if this one fails
+            if (mimeTypes.indexOf(mimeType) < mimeTypes.length - 1) {
+              console.log(`[audio] Trying next format...`);
+            }
+          };
+          
+          // If we got here without error, break
+          break;
+        } catch (e) {
+          console.warn(`[audio] Failed to create blob with ${mimeType}:`, e);
+        }
+      }
+      
+      // Reset for next recording
+      audioBuffer = [];
+      isStreamingAudio = false;
+    }
+
+    //now we need to convert this audio to PCM 16kHz because that is input to LiveAPI
+      async function convertToPCM16kHz(audioBuffer) {
+    // Create offline audio context with 16kHz sample rate
+    const offlineContext = new OfflineAudioContext(
+      1,  // mono
+      audioBuffer.length,
+      16000  // target sample rate
+    );
+    
+    // Create buffer source
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineContext.destination);
+    
+    // Render to PCM
+    const renderedBuffer = await offlineContext.startRendering();
+    
+    // Convert to Int16 PCM
+    const pcmData = new Int16Array(renderedBuffer.length);
+    const channelData = renderedBuffer.getChannelData(0);
+    
+    for (let i = 0; i < channelData.length; i++) {
+      // Convert float32 (-1 to 1) to int16 (-32768 to 32767)
+      const sample = Math.max(-1, Math.min(1, channelData[i]));
+      pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    }
+    
+    return pcmData.buffer; // Return ArrayBuffer
+  }
+
+  //function to start recording
+  // requests mic with 16kHz
+  //uses scriptprocessornode to capture chunks in real time
+  // connects WebSocket
+  //updates UI
+      async function startRecording() {
+      try {
+        // Reset audio buffer for new recording
+        audioBuffer = [];
+        
+        // Check if getUserMedia is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("getUserMedia is not supported in this browser");
+        }
+        
+        // Request microphone access with flexible constraints
+        // Browsers often ignore exact sampleRate/channelCount, so we make them "ideal"
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            // These are "ideal" - browser may use different values
+            sampleRate: { ideal: 16000 },
+            channelCount: { ideal: 1 }
+          }
+        }).catch(err => {
+          console.error("getUserMedia error:", err.name, err.message);
+          throw err;
+        });
+        
+        console.log("[audio] Microphone access granted");
+        console.log("[audio] Audio tracks:", mediaStream.getAudioTracks());
+        
+        // Create audio context (browser will use its default sample rate)
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Get actual sample rate (might not be 16kHz)
+        const actualSampleRate = audioContext.sampleRate;
+        console.log("[audio] AudioContext sample rate:", actualSampleRate);
+        
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        
+        // Create script processor to capture audio
+        // Note: ScriptProcessorNode is deprecated but still widely supported
+        const bufferSize = 4096;
+        const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+        
+        processor.onaudioprocess = (e) => {
+          if (!isRecording) return;
+          
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          // If sample rate is not 16kHz, we need to resample
+          // For now, send as-is and let backend handle it, or resample here
+          const pcmData = new Int16Array(inputData.length);
+          
+          // Convert float32 to int16
+          for (let i = 0; i < inputData.length; i++) {
+            const sample = Math.max(-1, Math.min(1, inputData[i]));
+            pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+          
+          // Send audio chunk to backend via WebSocket
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(pcmData.buffer); // Send as ArrayBuffer
+          }
+        };
+        
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        
+        console.log("[audio] ScriptProcessorNode created and connected");
+        
+        // Update UI first (so user can see stop button even if WebSocket fails)
+        isRecording = true;
+        
+        const recordBtn = document.getElementById("recordBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const audioStatus = document.getElementById("audioStatus");
+        
+        recordBtn.style.display = "none";
+        stopBtn.style.display = "inline-block";
+        stopBtn.style.visibility = "visible";
+        audioStatus.textContent = "🎤 Recording... Speak now!";
+        
+        console.log("[ui] Recording started - stop button should be visible");
+        
+        // Connect WebSocket if not already connected (non-blocking)
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          connectWebSocket().catch(err => {
+            console.error("[ws] Failed to connect WebSocket:", err);
+            audioStatus.textContent = "⚠️ Recording... (WebSocket connecting...)";
+          });
+        }
+        
+      } catch (error) {
+        console.error("[audio] Error starting recording:", error);
+        console.error("[audio] Error name:", error.name);
+        console.error("[audio] Error message:", error.message);
+        
+        // Provide more specific error messages
+        let errorMsg = "Failed to access microphone.";
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          errorMsg = "Microphone permission denied. Please allow microphone access and try again.";
+        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+          errorMsg = "No microphone found. Please connect a microphone and try again.";
+        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          errorMsg = "Microphone is already in use by another application.";
+        } else if (error.message.includes("getUserMedia")) {
+          errorMsg = "Browser does not support microphone access. Please use a modern browser.";
+        }
+        
+        alert(errorMsg);
+        
+        // Reset UI on error
+        document.getElementById("recordBtn").style.display = "inline-block";
+        document.getElementById("stopBtn").style.display = "none";
+        document.getElementById("audioStatus").textContent = "";
+      }
+    }
+
+        function stopRecording() {
+      console.log("[ui] stopRecording called, isRecording:", isRecording);
+      
+      if (!isRecording && !mediaStream) {
+        console.log("[ui] Not recording, nothing to stop");
+        return;
+      }
+      
+      isRecording = false;
+      
+      // Stop media stream tracks
+      if (mediaStream) {
+        console.log("[ui] Stopping media stream tracks");
+        mediaStream.getTracks().forEach(track => {
+          track.stop();
+          console.log("[ui] Stopped track:", track.kind);
+        });
+        mediaStream = null;
+      }
+      
+      // Close audio context
+      if (audioContext) {
+        console.log("[ui] Closing audio context");
+        audioContext.close().catch(err => {
+          console.error("[audio] Error closing audio context:", err);
+        });
+        audioContext = null;
+      }
+      
+      // Send "complete" signal to backend
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log("[ui] Sending complete signal to backend");
+        ws.send(JSON.stringify({ type: "complete" }));
+      } else {
+        console.warn("[ui] WebSocket not connected, cannot send complete signal");
+      }
+      
+      // Update UI
+      const recordBtn = document.getElementById("recordBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const audioStatus = document.getElementById("audioStatus");
+      
+      recordBtn.style.display = "inline-block";
+      stopBtn.style.display = "none";
+      stopBtn.style.visibility = "hidden";
+      audioStatus.textContent = "⏳ Processing...";
+      
+      console.log("[ui] UI updated - recording stopped");
+    }
+
+    const form = document.getElementById("form");
+    const textArea = document.getElementById("text");
+    const btn = document.getElementById("btn");
+    const clearBtn = document.getElementById("clear");
+    const result = document.getElementById("result");
+    const playerWrap = document.getElementById("playerWrap");
+    const player = document.getElementById("player");
+    const download = document.getElementById("download");
+
+    function setBusy(isBusy, message){
+      btn.disabled = isBusy;
+      result.textContent = message || "";
+    }
+
+    function resetMedia(){
+      playerWrap.style.display = "none";
+      player.src = "";
+      download.style.display = "none";
+      download.href = "";
+    }
+
+    clearBtn.addEventListener("click", () => {
+      textArea.value = "";
+      result.textContent = "";
+      resetMedia();
+      textArea.focus();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = textArea.value.trim();
+
+      if (!text) {
+        result.textContent = "Please enter some text.";
+        textArea.focus();
+        return;
+      }
+
+      // Reset UI
+      resetMedia();
+      setBusy(true, "⚙️ Generating audio...");
+
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+
+        if (!res.ok) throw new Error(await res.text().catch(()=>"Request failed"));
+
+        const data = await res.json();
+        if (!data.signedUrl) throw new Error("No signed URL returned from server.");
+
+        // Show player + download
+        player.src = data.signedUrl;
+        playerWrap.style.display = "block";
+        download.href = data.signedUrl;
+        download.style.display = "inline-block";
+
+        setBusy(false, "✅ Ready! Click play or download.");
+        try { await player.play(); } catch { /* Autoplay may be blocked */ }
+      } catch (err) {
+        console.error(err);
+        setBusy(false, "❌ Error: " + (err?.message || "Unknown error"));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Keyboard shortcut: Cmd/Ctrl+Enter to submit
+    textArea.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        form.requestSubmit();
+      }
+    });
+
+    // Get buttons
+const recordBtn = document.getElementById("recordBtn");
+const stopBtn = document.getElementById("stopBtn");
+
+// Add event listeners
+recordBtn.addEventListener("click", startRecording);
+stopBtn.addEventListener("click", stopRecording);
+
+// Cleanup on page unload
+window.addEventListener("beforeunload", () => {
+  if (ws) ws.close();
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+  }
+});
+
+
+  </script>
+</body>
+</html>

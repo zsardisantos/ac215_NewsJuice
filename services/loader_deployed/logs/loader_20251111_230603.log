@@ -1,0 +1,8 @@
+2025-11-11 23:06:03,880 - main - INFO - Logging to file: logs/loader_20251111_230603.log
+2025-11-11 23:06:09,896 - main - INFO - === Starting background article processing ===
+2025-11-11 23:06:09,896 - main - INFO - Background task queued successfully
+2025-11-11 23:06:09,897 - loader - INFO - === Starting chunk_embed_load - Method: semantic-split ===
+2025-11-11 23:06:09,897 - loader - INFO - Using tables - Articles: articles_test, Vectors: chunks_vector_test
+2025-11-11 23:06:10,589 - loader - INFO - Connected to database
+2025-11-11 23:06:11,992 - loader - INFO - Fetched 0 articles with vflag=0
+2025-11-11 23:06:11,993 - loader - INFO - No new articles to process

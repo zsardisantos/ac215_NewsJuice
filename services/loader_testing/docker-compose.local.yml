@@ -1,0 +1,77 @@
+# docker-compose.local.yml for LOADER_DEPLOYED
+
+services:
+  # Cloud SQL Proxy - connects to your Cloud SQL instance
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+    command:
+      - "--address=0.0.0.0"
+      - "--port=5432"
+      - "newsjuice-123456:us-central1:newsdb-instance"
+    volumes:
+      - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    #networks:
+    #  - chatter-network
+
+  # Your Loader API
+  loader:
+    build:
+      context: .
+      #args:
+      #  HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - cloud-sql-proxy
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
+      - DB_URL=postgresql://postgres:Newsjuice25%2B@cloud-sql-proxy:5432/newsdb
+
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # Google Cloud
+      - GOOGLE_CLOUD_PROJECT=newsjuice-123456
+      - GOOGLE_CLOUD_REGION=us-central1
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/sa-key.json
+      - GEMINI_SERVICE_ACCOUNT_PATH=/app/secrets/gemini-service-account.json
+
+      # GCS
+      #- AUDIO_BUCKET=ac215-audio-bucket
+      #- GCS_PREFIX=podcasts/
+      #- CACHE_CONTROL=public, max-age=3600
+
+      # CORS
+      - CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080,http://localhost:8000
+
+      # Server
+      - PORT=8080
+
+      # Model path (baked into image)
+      #- SENTENCE_MODEL_PATH=/app/models/all-mpnet-base-v2
+
+    volumes:
+      # Mount service account keys (read-only)
+      - ../../../secrets/sa-key.json:/app/secrets/sa-key.json:ro
+      - ../../../secrets/gemini-service-account.json:/app/secrets/gemini-service-account.json:ro
+      - ./logs:/app/logs  # Maps container /app/logs to host ./logs
+      # Optional: Mount code for hot-reload during development
+      # Uncomment these lines if you want to edit code without rebuilding
+      # - ./main.py:/app/main.py
+      # - ./chatter_handler.py:/app/chatter_handler.py
+      # - ./helpers.py:/app/helpers.py
+      # - ./retriever.py:/app/retriever.py
+
+    restart: unless-stopped
+    #networks:
+    #  - loader-network
+
+#networks:
+#  loader-network:
+#    driver: bridge

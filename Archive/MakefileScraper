@@ -1,0 +1,23 @@
+# To run the scraper in local for testing
+# Make sure docker-compose.yml has services named "scraper" and "dbproxy"
+# Run with "make -f MakefileScraper run
+
+.PHONY: run build scrape up-proxy down clean
+
+run: build up-proxy scrape ## Build images, start proxy, scrape articles
+	@echo "✅ Scraper has finished."
+
+build:
+	docker compose build scraper
+
+up-proxy:
+	docker compose up -d dbproxy
+
+scrape:
+	docker compose run --rm scraper
+
+down:
+	docker compose down
+
+clean: down
+	@echo "💥Scraper container deleted after successful run"

@@ -1,0 +1,45 @@
+# CURRENTLY NOT USED
+
+
+# cloudbuild.yaml (Enhanced with deployment)
+
+
+substitutions:
+  _IMAGE_NAME: us-central1-docker.pkg.dev/newsjuice-123456/cloud-run-source-deploy/loader
+  _HUGGING_FACE_HUB_TOKEN: ""
+  _SERVICE_NAME: loader
+  _REGION: us-central1
+
+steps:
+  # Step 1: Build Docker image
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - "-t"
+      - "${_IMAGE_NAME}:latest"
+      - "--build-arg"
+      - "HUGGING_FACE_HUB_TOKEN=${_HUGGING_FACE_HUB_TOKEN}"
+      - "."
+  
+  # Step 2: Push image to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - "${_IMAGE_NAME}:latest"
+  
+  # Step 3: Deploy to Cloud Run
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=${_IMAGE_NAME}:latest
+      - --region=${_REGION}
+      - --platform=managed
+      - --env-vars-file=env.yaml 
+      - --add-cloudsql-instances=newsjuice-123456:us-central1:newsdb-instance
+      - --allow-unauthenticated
+
+images:
+  - "${_IMAGE_NAME}:latest"
