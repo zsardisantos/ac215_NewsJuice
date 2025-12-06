@@ -253,6 +253,10 @@ if enable_cloudrun:
                                     name="GCP_REGION",
                                     value=region,
                                 ),
+                                gcp.cloudrun.ServiceTemplateSpecContainerEnvArgs(
+                                    name="GOOGLE_CLOUD_PROJECT",
+                                    value=project,
+                                ),
                             ] + [
                                 gcp.cloudrun.ServiceTemplateSpecContainerEnvArgs(
                                     name=env_name,

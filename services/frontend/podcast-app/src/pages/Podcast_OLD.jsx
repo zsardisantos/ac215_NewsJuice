@@ -24,9 +24,6 @@ function Podcast() {
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [statusMessage, setStatusMessage] = useState("Go ahead, I'm listening")
-  //New - to deal with iOS issue
-  const [pendingQaAudio, setPendingQaAudio] = useState(false)  // iOS: shows play button when autoplay blocked
-  
   const [menuOpen, setMenuOpen] = useState(false)
   const [showOrbSelector, setShowOrbSelector] = useState(false)
   const [selectedOrb, setSelectedOrb] = useState(1)
@@ -70,9 +67,10 @@ function Podcast() {
     vadEnabledRef.current = vadEnabled
   }, [vadEnabled])
 
-  // iOS Safari audio unlock - must happen on first user interaction
+  // iOS Safari audio unlock - must happen on first user interaction I CHANGED THIS (CM)
   useEffect(() => {
     const unlockAudio = () => {
+      // Create a silent audio context to unlock iOS audio
       const AudioContext = window.AudioContext || window.webkitAudioContext
       if (AudioContext) {
         const ctx = new AudioContext()
@@ -93,6 +91,9 @@ function Podcast() {
       document.removeEventListener('click', unlockAudio)
     }
   }, [])
+
+
+
 
   // Handle voice interruption when VAD detects speech
   const handleVoiceInterruption = () => {
@@ -207,10 +208,19 @@ function Podcast() {
   }
 
   // ========== API HELPER ==========
+  //const getApiUrl = () => {
+  //  const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+  //  return isProduction
+  //    ? 'http://136.113.170.71'
+  //    : 'http://136.113.170.71'
+ // }
+
   const getApiUrl = () => {
     const isProduction = window.location.hostname.includes('newsjuiceapp.com')
     return isProduction ? '' : 'http://localhost:8080'
   }
+
+
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('auth_token')
@@ -471,6 +481,34 @@ function Podcast() {
 
   // ========== Q&A FUNCTIONS (EXISTING) ==========
 
+  // WebSocket URL
+//  const getWebSocketUrl = () => {
+//    const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+//    const protocol = isProduction ? 'wss' : 'ws'
+//    const host = isProduction
+//      ? 'http://136.113.170.71'
+//      : 'http://136.113.170.71'
+//    const token = localStorage.getItem('auth_token')
+//    return `${protocol}://${host}/ws/chat${token ? `?token=${token}` : ''}`
+//  }
+
+  // NEW FOR PULUMI
+  //const getWebSocketUrl = () => {
+  // const isProduction = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+  //  const protocol = isProduction ? 'ws' : 'ws'  // Use ws for IP address (no SSL)
+  //  const host = isProduction
+  //    ? '136.113.170.71:80'
+  //    : 'localhost:8080'
+  //  return `${protocol}://${host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+  //}
+
+  //const getWebSocketUrl = () => {
+  //  const isProduction = window.location.hostname.includes('newsjuiceapp.com')
+  //  const protocol = isProduction ? 'wss' : 'ws'
+  //  const host = isProduction ? window.location.host : 'localhost:8080'
+  //  return `${protocol}://${host}/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
+  //}
+
   const getWebSocketUrl = () => {
     const isProduction = window.location.hostname.includes('newsjuiceapp.com')
     if (isProduction) {
@@ -478,6 +516,10 @@ function Podcast() {
     }
     return `ws://localhost:8080/ws/chat?token=${localStorage.getItem('auth_token') || ''}`
   }
+
+
+// return `${protocol}://${host}/ws/chat?token=${currentUser?.accessToken || ''}`
+
 
   // Connect WebSocket
   const connectWebSocket = () => {
@@ -606,8 +648,6 @@ function Podcast() {
     }
 
     const mimeTypes = ['audio/wav', 'audio/wave', 'audio/x-wav']
-    //const mimeTypes = ['audio/mpeg', 'audio/mp3']
-
 
     for (const mimeType of mimeTypes) {
       try {
@@ -621,14 +661,6 @@ function Podcast() {
         }
 
         audioPlayerRef.current.src = audioUrl
-
-        audioPlayerRef.current.onloadstart = () => console.log("[audio] onloadstart - loading started")
-        audioPlayerRef.current.onerror = (e) => console.error("[audio] onerror:", audioPlayerRef.current.error)
-
-        audioPlayerRef.current.onprogress = () => console.log("[audio] onprogress - loading data")
-        audioPlayerRef.current.onstalled = () => console.log("[audio] onstalled - loading stalled")
-        audioPlayerRef.current.onsuspend = () => console.log("[audio] onsuspend - loading suspended")
-
         audioPlayerRef.current.oncanplay = () => {
           if (isRecordingRef.current || preventAutoPlayRef.current) {
             console.log("[audio] oncanplay - Skipping playback, recording active")
@@ -641,34 +673,10 @@ function Podcast() {
           }
           console.log("[audio] Audio can play, attempting autoplay")
           setIsPlaying(true)
-          setAudioMode('PLAYING_QA')
-          
-          // iOS Safari fix: Handle autoplay promise rejection
-          const playPromise = audioPlayerRef.current.play()
-          
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                console.log("[audio] Playback started successfully")
-              })
-              .catch((err) => {
-                console.warn("[audio] Autoplay blocked on iOS:", err)
-                //setStatusMessage("📱 Tap screen to play audio")
-                setStatusMessage("📱 Tap sthe green button to hear the answer")
-                // NEW
-                setPendingQaAudio(true)
-                // Add tap handler to play audio on iOS
-                //const playOnTap = () => {
-                //  if (audioPlayerRef.current) {
-                //    audioPlayerRef.current.play()
-                //  }
-                //  document.removeEventListener('click', playOnTap)
-                //  document.removeEventListener('touchstart', playOnTap)
-                //}
-                //document.addEventListener('click', playOnTap, { once: true })
-                //document.addEventListener('touchstart', playOnTap, { once: true })
-              })
-          }
+          setAudioMode('PLAYING_QA')  // [Phase 1] Set mode to PLAYING_QA
+          audioPlayerRef.current.play().catch((err) => {
+            console.warn("[audio] Autoplay blocked:", err)
+          })
 
           // [Phase 2] Restart VAD during Q&A playback so user can ask follow-up questions
           if (vadEnabled && vad && !vad.loading && !vad.errored) {
@@ -680,7 +688,6 @@ function Podcast() {
 
         audioPlayerRef.current.onended = () => {
           setIsPlaying(false)
-          setPendingQaAudio(false)
           setStatusMessage("Go ahead, I'm listening")
 
           // [Phase 1] AUTO-RESUME DAILY BRIEF AFTER Q&A
@@ -1313,35 +1320,6 @@ function Podcast() {
               >
                 <p className="text-sm text-gray-300">{statusMessage}</p>
               </motion.div>
-
-
-
-              {/* iOS Play Button - Shows when autoplay is blocked */}
-              {pendingQaAudio && (
-                <motion.button
-                  onClick={() => {
-                    if (audioPlayerRef.current) {
-                      audioPlayerRef.current.play()
-                        .then(() => {
-                          setPendingQaAudio(false)
-                          setIsPlaying(true)
-                          setStatusMessage("🎧 Playing answer...")
-                        })
-                        .catch(e => console.error("Play failed:", e))
-                    }
-                  }}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full font-bold text-lg shadow-lg shadow-green-500/30 flex items-center justify-center gap-3"
-                >
-                  <Play size={24} />
-                  Tap to Play Answer
-                </motion.button>
-              )}            
-
-
-
 
               {/* Call Buttons */}
               <div className="flex items-center gap-6">

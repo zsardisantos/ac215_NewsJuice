@@ -43,3 +43,4 @@ EXPOSE 8080
 #CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 #CMD python wait_for_db.py && uv run uvicorn main:app --host 0.0.0.0 --port 8080
 CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+
