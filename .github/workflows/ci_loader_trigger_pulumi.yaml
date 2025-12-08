@@ -1,4 +1,5 @@
-name: CI - Loader Tests New Folders
+name: CI - Loader Tests Trigger Deployment
+
 
 on:
   push:
@@ -166,15 +167,11 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       
-      - name: Set up Cloud SDK
+      - name: Set up Cloud SDK with GKE plugin
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT }}
-      
-      - name: Install GKE auth plugin
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+          install_components: 'gke-gcloud-auth-plugin'
       
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
@@ -188,8 +185,7 @@ jobs:
           python-version: '3.12'
       
       - name: Install deployment dependencies
-        run: |
-          pip install pulumi pulumi-gcp pulumi-docker-build pulumi-kubernetes
+        run: pip install pulumi pulumi-gcp pulumi-docker-build pulumi-kubernetes
       
       - name: Configure GKE credentials
         env:
@@ -220,24 +216,11 @@ jobs:
           description: NewsJuice Loader Service with Cloud SQL PostgreSQL
           EOF
           
-          # Create symlinks to match absolute paths in __main__.py
           sudo ln -sf $GITHUB_WORKSPACE/services/loader_deployed /loader_deployed
           sudo ln -sf $GITHUB_WORKSPACE/services/scraper_deployed /scraper_deployed
           sudo ln -sf $GITHUB_WORKSPACE/services/chatter_deployed /chatter_deployed
           sudo ln -sf $GITHUB_WORKSPACE/services/frontend/podcast-app /frontend
           
-          # Debug: verify symlinks
-          echo "Checking symlinks..."
-          ls -la /loader_deployed/Dockerfile
-          ls -la /scraper_deployed/Dockerfile
-          ls -la /chatter_deployed/Dockerfile
-          ls -la /frontend/Dockerfile
-          
-          # Debug: verify kubectl works
-          echo "Testing kubectl..."
-          kubectl get nodes || echo "kubectl failed but continuing..."
-          
-          # Run Pulumi
           pulumi stack select dev
           pulumi cancel --yes || true
           pulumi refresh --yes --skip-preview || true
@@ -264,4 +247,3 @@ jobs:
           echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| System Tests | ${{ needs.system-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
-          
