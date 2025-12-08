@@ -12,6 +12,8 @@ Uses Vertex AI for embeddings of the chunks
 - `semantic-split` (using embedding model below)
 
 
+
+
 Database Information
 - **Account:** `harvardnewsjuice@gmail.com`  
 - **Project:** `NewsJuice`  
