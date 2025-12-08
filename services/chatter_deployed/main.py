@@ -46,7 +46,10 @@ from fastapi import (
 # from fastapi.responses import StreamingResponse
 # streaming response stream audio chunks back to frontend
 from speech_to_text_client import audio_to_text  # Speech-to-Text function
-from text_to_speech_client import text_to_audio_stream, text_to_audio_bytes  # Google Cloud Text-to-Speech streaming and non-streaming
+from text_to_speech_client import (
+    text_to_audio_stream,
+    text_to_audio_bytes,
+)  # Google Cloud Text-to-Speech streaming and non-streaming
 from gcs_storage import upload_audio_to_gcs  # GCS storage for audio files
 from fastapi.middleware.cors import CORSMiddleware
 import json
@@ -114,9 +117,9 @@ except Exception as e:
 
 
 # --------------------------
-# Initialize Gemini Model 
+# Initialize Gemini Model
 # --------------------------
-#try:
+# try:
 #    if os.path.exists(GEMINI_SERVICE_ACCOUNT_PATH):
 #        # set credentials file path for Vertex AI
 #        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GEMINI_SERVICE_ACCOUNT_PATH
@@ -130,10 +133,9 @@ except Exception as e:
 #        )
 #    else:
 #        model = None
-#except Exception as e:
+# except Exception as e:
 #    print(f"[gemini-error] Failed to configure service account: {e}")
 #    model = None
-
 
 
 # --------------------------------------------
@@ -150,17 +152,21 @@ except Exception as e:
 # Health
 # --------------------------
 
+
 @app.get("/")
 async def root() -> Dict[str, bool]:
     return {"ok": True}
+
 
 @app.get("/healthz")
 async def healthz_root() -> Dict[str, bool]:
     return {"ok": True}
 
+
 @app.get("/health")
 async def health_check() -> Dict[str, bool]:
     return {"ok": True}
+
 
 # --------------------------
 # Helper Functions
@@ -250,7 +256,10 @@ async def _retrieve_and_generate_podcast(
                 # Print each chunk with its similarity score
                 print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
                 for i, (chunk_id, chunk_text, source_type, score) in enumerate(chunks):
-                    print(f"  Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, Score: {score:.4f}): {chunk_text[:100]}...")
+                    print(
+                        f"  Chunk {i+1} (ID: {chunk_id}, Source: {source_type}, "
+                        f"Score: {score:.4f}): {chunk_text[:100]}..."
+                    )
                 all_chunks.extend(chunks)
 
         # Remove duplicates based on chunk ID (keep first occurrence)
@@ -297,7 +306,7 @@ async def _retrieve_and_generate_podcast(
             preferences = get_user_preferences(user_id)
             voice_preference = preferences.get("voice_preference", "en-US-Studio-O")
             print(f"[websocket] Using voice preference: {voice_preference}")
-        
+
         await websocket.send_json({"status": "streaming_audio"})
         result = await text_to_audio_stream(podcast_text, websocket, voice_name=voice_preference)
 
@@ -413,7 +422,7 @@ async def websocket_chatter(websocket: WebSocket):
                             if is_processing:
                                 print("[websocket] Already processing a request, " "ignoring new complete signal")
                                 continue
-                                
+
                             # Check if we have audio to process
                             if len(audio_buffer) == 0:
                                 print("[websocket] ERROR: No audio received in buffer!")
@@ -470,10 +479,13 @@ async def websocket_chatter(websocket: WebSocket):
                             if daily_brief_id or user_id:  # Fallback: fetch by user_id if no ID provided
                                 print("[websocket] Checking for daily brief context...")
                                 from helpers import get_daily_brief_context
+
                                 brief_context = get_daily_brief_context(user_id)
 
                                 if brief_context:
-                                    print(f"[websocket] Found daily brief context: {len(brief_context['chunks'])} chunks")
+                                    print(
+                                        f"[websocket] Found daily brief context: {len(brief_context['chunks'])} chunks"
+                                    )
                                 else:
                                     print("[websocket] No daily brief context found for today")
 
@@ -481,6 +493,7 @@ async def websocket_chatter(websocket: WebSocket):
                             if brief_context:
                                 await websocket.send_json({"status": "classifying_question"})
                                 from helpers import classify_question_context
+
                                 classification = classify_question_context(text, brief_context["transcript"], model)
                                 print(f"\n{'='*60}")
                                 print(f"[CLASSIFICATION RESULT] {classification}")
@@ -496,12 +509,16 @@ async def websocket_chatter(websocket: WebSocket):
                             if use_brief_context:
                                 # CONTEXTUAL question - use original query, no enhancement
                                 # Preserves brief-specific references like "what did you say about..."
-                                print("\n[STRATEGY] CONTEXTUAL QUESTION - Using daily brief chunks (no query enhancement)")
+                                print(
+                                    "\n[STRATEGY] CONTEXTUAL QUESTION - Using daily brief chunks (no query enhancement)"
+                                )
                                 print(f"[STRATEGY] Original query: {text}\n")
                                 enhanced_queries = {"enhanced_query_1": text}
                             else:
                                 # GENERAL question - enhance query for better retrieval
-                                print("\n[STRATEGY] GENERAL QUESTION - Using full retrieval pipeline with query enhancement\n")
+                                print(
+                                    "\n[STRATEGY] GENERAL QUESTION - Using retrieval pipeline with query enhancement\n"
+                                )
                                 await websocket.send_json({"status": "enhancing_query"})
                                 print("[websocket] Enhancing query for general question...")
 
@@ -652,11 +669,13 @@ async def get_preferences_endpoint(request: Request):
     except AttributeError:
         raise HTTPException(status_code=401, detail="User not authenticated")
 
-#Z [ save user preferences endpoint] its an endpoint because its a separate resource
+
+# Z [ save user preferences endpoint] its an endpoint because its a separate resource
 # CRUD operations; GET /api/user/preferences = read preferences, POST /api/user/preferences = Create/Update preferences
-# DELETE /api/user/preferences = could delete preferences 
-# we have separate endpoints for /api/users (users mgtmt) /api/articles (aticles management) and /api/daily-brief 
-#separate user preferences endpoint from daily brief because user may want to change preferences without generating a dialy brief
+# DELETE /api/user/preferences = could delete preferences
+# we have separate endpoints for /api/users (users mgtmt) /api/articles (aticles management) and /api/daily-brief
+# separate user preferences endpoint from daily brief because user may want to change preferences without generating
+# a dialy brief
 @app.post("/api/user/preferences")
 async def save_preferences_endpoint(request: Request, preferences: Dict[str, Any] = Body(...)):
     """Save user preferences."""
@@ -668,11 +687,11 @@ async def save_preferences_endpoint(request: Request, preferences: Dict[str, Any
         # This uses ON CONFLICT DO NOTHING, so it's safe to call even if user exists
         create_user(user_id, user_email)
 
-        #[Z] this saves the user preferences in our user_preferences table in CloudSQL
-#         user_id  | preference_key | preference_value
-#    ---------|----------------|------------------
-#    abc123   | topics         | ["Politics","Tech"]
-#    abc123   | sources        | ["Harvard Gazette"]
+        # [Z] this saves the user preferences in our user_preferences table in CloudSQL
+        #         user_id  | preference_key | preference_value
+        #    ---------|----------------|------------------
+        #    abc123   | topics         | ["Politics","Tech"]
+        #    abc123   | sources        | ["Harvard Gazette"]
         success = save_user_preferences(user_id, preferences)
         if success:
             return {"status": "success", "message": "Preferences saved"}
@@ -697,10 +716,11 @@ async def get_history_endpoint(request: Request, limit: int = 10):
 # Daily Brief Endpoints
 # --------------------------
 
+
 @app.post("/api/daily-brief")
 async def generate_daily_brief_endpoint(request: Request):
     """Generate a personalized daily news briefing based on user preferences.
-    
+
     If only voice preference changed (not topics/sources), regenerates audio from existing transcript.
     Otherwise, generates a new transcript and audio.
     """
@@ -711,60 +731,69 @@ async def generate_daily_brief_endpoint(request: Request):
         # Load user preferences from user_preferences table in CloudSQL
         #  (this function comes from the user_db.py script)
         preferences = get_user_preferences(user_id)
-        
+
         # Check if only voice preference changed (not topics/sources)
         # We check by comparing when voice was updated vs when content preferences were updated
         # If voice was updated more recently than content preferences, it's a voice-only change
         content_prefs_updated = get_preferences_last_updated(user_id)
         voice_pref_updated = get_voice_preference_last_updated(user_id)
-        
+
         voice_only_change = False
         if voice_pref_updated:
             try:
-                voice_updated = datetime.fromisoformat(voice_pref_updated.replace('Z', '+00:00'))
-                
+                voice_updated = datetime.fromisoformat(voice_pref_updated.replace("Z", "+00:00"))
+
                 # If content preferences exist, compare timestamps
                 if content_prefs_updated:
-                    content_updated = datetime.fromisoformat(content_prefs_updated.replace('Z', '+00:00'))
+                    content_updated = datetime.fromisoformat(content_prefs_updated.replace("Z", "+00:00"))
                     # Voice updated more recently than content = voice only change
                     if voice_updated > content_updated:
                         voice_only_change = True
-                        print(f"[daily-brief] Only voice preference changed (voice: {voice_updated}, content: {content_updated}), will regenerate audio from existing transcript")
+                        print(
+                            f"[daily-brief] Only voice preference changed (voice: {voice_updated}, "
+                            f"content: {content_updated}), will regenerate audio from existing transcript"
+                        )
                 else:
                     # No content preferences exist, check if there's a recent brief to regenerate
                     # If voice was updated and we have a brief from today, it's likely a voice-only change
                     last_generated_str = preferences.get("last_daily_brief_generated")
                     if last_generated_str:
-                        last_generated = datetime.fromisoformat(last_generated_str.replace('Z', '+00:00'))
+                        last_generated = datetime.fromisoformat(last_generated_str.replace("Z", "+00:00"))
                         today = datetime.now(timezone.utc).date()
                         last_date = last_generated.date()
                         # If brief was generated today and voice was updated, assume voice-only change
                         if last_date == today:
                             voice_only_change = True
-                            print(f"[daily-brief] Voice preference changed (no content prefs, brief from today), will regenerate audio from existing transcript")
+                            print(
+                                """[daily-brief] Voice preference changed (no content prefs, brief from today),
+                                will regenerate audio from existing transcript"""
+                            )
             except (ValueError, AttributeError) as e:
                 print(f"[daily-brief] Error parsing timestamps: {e}")
                 pass
-        
+
         # If only voice changed, get latest transcript and regenerate audio
         if voice_only_change:
             # Get the most recent daily brief transcript
             history = get_audio_history(user_id, limit=50)
             daily_briefs = [h for h in history if h.get("question_text") == "Daily Brief"]
-            
+
             if daily_briefs and daily_briefs[0].get("podcast_text"):
                 latest_brief = daily_briefs[0]
-                
+
                 # Check if we've already regenerated audio for this voice change
                 # If the brief's created_at is after the voice preference was updated, we've already handled it
                 if voice_pref_updated and latest_brief.get("created_at"):
                     try:
-                        voice_updated = datetime.fromisoformat(voice_pref_updated.replace('Z', '+00:00'))
-                        brief_created = datetime.fromisoformat(latest_brief.get("created_at").replace('Z', '+00:00'))
-                        
+                        voice_updated = datetime.fromisoformat(voice_pref_updated.replace("Z", "+00:00"))
+                        brief_created = datetime.fromisoformat(latest_brief.get("created_at").replace("Z", "+00:00"))
+
                         # If brief was created after voice was updated, we've already regenerated it
                         if brief_created >= voice_updated:
-                            print(f"[daily-brief] Audio already regenerated for current voice preference (brief: {brief_created}, voice updated: {voice_updated})")
+                            print(
+                                f"""[daily-brief] Audio already regenerated for current voice preference
+                                (brief: {brief_created}, voice updated: {voice_updated})"""
+                            )
                             # Return the existing brief without regenerating
                             return {
                                 "success": True,
@@ -772,29 +801,29 @@ async def generate_daily_brief_endpoint(request: Request):
                                 "audio_url": latest_brief.get("audio_url"),
                                 "created_at": latest_brief.get("created_at"),
                                 "voice_only_update": False,  # Already handled
-                                "already_regenerated": True
+                                "already_regenerated": True,
                             }
                     except (ValueError, AttributeError) as e:
                         print(f"[daily-brief] Error comparing timestamps, proceeding with regeneration: {e}")
                         pass
-                
+
                 podcast_text = latest_brief.get("podcast_text")
                 print(f"[daily-brief] Using existing transcript ({len(podcast_text)} chars)")
-                
+
                 # Regenerate audio with new voice
                 voice_preference = preferences.get("voice_preference", "en-US-Studio-O")
                 print(f"[daily-brief] Regenerating audio with voice: {voice_preference}")
                 audio_bytes = text_to_audio_bytes(podcast_text, voice_name=voice_preference)
-                
+
                 if not audio_bytes:
                     raise HTTPException(status_code=500, detail="Failed to generate audio from text")
-                
+
                 # Upload new audio
                 audio_url = upload_audio_to_gcs(audio_bytes, user_id, filename_prefix="daily-brief")
-                
+
                 if not audio_url:
                     raise HTTPException(status_code=500, detail="Failed to upload audio to storage")
-                
+
                 # Update the existing audio_history entry with new audio URL
                 # Note: We keep the same transcript but update the audio
                 # Since save_audio_history creates a new entry, we'll create a new entry
@@ -806,36 +835,36 @@ async def generate_daily_brief_endpoint(request: Request):
                 elif source_chunks is None:
                     source_chunks = None
                 # If it's already a string, use it as-is
-                
+
                 save_audio_history(
                     user_id=user_id,
                     question_text="Daily Brief",
                     podcast_text=podcast_text,
                     audio_url=audio_url,
-                    source_chunks=source_chunks  # Keep same chunks
+                    source_chunks=source_chunks,  # Keep same chunks
                 )
-                
+
                 # Don't update last_daily_brief_generated timestamp for voice-only changes
                 # This allows subsequent calls to still detect voice-only changes
                 # We only update it for full regenerations
                 # Use the existing last_generated timestamp for the response
                 last_generated_str = preferences.get("last_daily_brief_generated")
-                
-                print(f"[daily-brief] Successfully regenerated audio with new voice")
+
+                print("[daily-brief] Successfully regenerated audio with new voice")
                 return {
                     "success": True,
                     "podcast_text": podcast_text,
                     "audio_url": audio_url,
                     "created_at": last_generated_str or datetime.now(timezone.utc).isoformat(),
-                    "voice_only_update": True
+                    "voice_only_update": True,
                 }
             else:
                 # Fall through to full generation if no existing brief found
-                print(f"[daily-brief] No existing transcript found, generating new brief")
-        
+                print("[daily-brief] No existing transcript found, generating new brief")
+
         # Full generation path (new transcript + audio)
         """
-        Example rows for a single user in user_preferences table is 
+        Example rows for a single user in user_preferences table is
         ──────────┬────────────────────────────────┬─────────────────────────────────────────┬─────────────────────┐
 │ user_id  │ preference_key                 │ preference_value                        │ updated_at          │
 ├──────────┼────────────────────────────────┼─────────────────────────────────────────┼─────────────────────┤
@@ -846,8 +875,9 @@ async def generate_daily_brief_endpoint(request: Request):
 │ abc123   │ last_daily_brief_generated     │ 2025-12-02T14:25:00Z                    │ 2025-12-02 14:25:00 │
 
 so this function is literally pulling the values from the associated preference
-topics_str = preference.get("topics", "[]") pulls the list of preferred topics (inside preference_value) based on the preference_key, "topics".
-        
+topics_str = preference.get("topics", "[]") pulls the list of preferred topics (inside preference_value)
+ based on the preference_key, "topics".
+
         """
 
         # parse topics and sources from the preferences
@@ -855,8 +885,8 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
         sources_str = preferences.get("sources", "[]")
 
         try:
-            #these arrays of topics and sources are stored as JSON strings, so they need to be parsed back
-            #via json.loads()
+            # these arrays of topics and sources are stored as JSON strings, so they need to be parsed back
+            # via json.loads()
             topics = json.loads(topics_str) if isinstance(topics_str, str) else topics_str
             sources = json.loads(sources_str) if isinstance(sources_str, str) else sources_str
         except json.JSONDecodeError:
@@ -868,14 +898,13 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
 
         if not topics or not sources:
             raise HTTPException(
-                status_code=400,
-                detail="No preferences set. Please configure topics and sources first."
+                status_code=400, detail="No preferences set. Please configure topics and sources first."
             )
-        #in this search_articles_by_preferneces function we combine topics into a single string
-        #i.e. "politics technology", generate an embedding vector, and do hybrid retrieval SQL query
+        # in this search_articles_by_preferneces function we combine topics into a single string
+        # i.e. "politics technology", generate an embedding vector, and do hybrid retrieval SQL query
 
         # retreive the chunks based on their preferred topics and sources
-        #w/ associated parameters (30 chunks, 2 days back)
+        # w/ associated parameters (30 chunks, 2 days back)
         """
         SELECT id, chunk, source_type, embedding <=> %s AS score
         FROM vector_table
@@ -887,40 +916,32 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
         LIMIT 30;
         """
 
-        chunks = search_articles_by_preferences(
-            topics=topics,
-            sources=sources,
-            limit=30,
-            days_back=2
-        )
+        chunks = search_articles_by_preferences(topics=topics, sources=sources, limit=30, days_back=2)
 
         if not chunks:
-            raise HTTPException(
-                status_code=404,
-                detail="No articles found matching your preferences"
-            )
+            raise HTTPException(status_code=404, detail="No articles found matching your preferences")
 
         print(f"[daily-brief] Retrieved {len(chunks)} chunks")
 
-        # format context for Gemini API so that the podcast generation accuratelty mentions the news source title where the info came from
-        #so context_text is literally a list of [Article Title: "title" \n "chunk"] for however many chunks we return
-        context_text = "\n\n".join([
-            f"Article Title: {source_type}\n{chunk}"
-            for _, chunk, source_type, score in chunks
-        ])
+        # format context for Gemini API so that the podcast generation accuratelty mentions the news source title where
+        # the info came from
+        # so context_text is literally a list of [Article Title: "title" \n "chunk"] for however many chunks we return
+        context_text = "\n\n".join(
+            [f"Article Title: {source_type}\n{chunk}" for _, chunk, source_type, score in chunks]
+        )
 
-        
         try:
             # Create custom prompt for daily brief
             today_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
-            
+
             # build the full prompt for the gemini API call using the DAILY_BRIEF_PROMPT
-            
+
             DAILY_BRIEF_PROMPT = """
         You are a professional news anchor creating a daily briefing for Harvard community members.
 
         OBJECTIVE:
-        Create an engaging, comprehensive daily news summary covering the most important Harvard news stories from the provided articles.
+        Create an engaging, comprehensive daily news summary covering the most important Harvard news stories from
+        the provided articles.
 
         STRUCTURE:
         1. Opening: Brief welcome and overview of today's top stories (mention the date)
@@ -950,7 +971,7 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
         End with: "That's your Harvard News Daily Brief. Have a great day!"
         """
 
-            full_prompt = f"""{DAILY_BRIEF_PROMPT} 
+            full_prompt = f"""{DAILY_BRIEF_PROMPT}
 
 Today's date: {today_date}
 
@@ -959,9 +980,10 @@ Here are the news articles to summarize:
 {context_text}
 
 Now generate your daily briefing:"""
-            #this is literally calling the gemini_api directly to generate a podcast
+            # this is literally calling the gemini_api directly to generate a podcast
             # the call_gemini_api() is a script that is solely used for the interactive Q&A
-            #creating a separate helper for one use case is "overkill" according to claude, I think it is actually helpful, but eh
+            # creating a separate helper for one use case is "overkill" according to claude, I think it is actually
+            # helpful, but eh
             response = model.generate_content(full_prompt)
             podcast_text = response.text
 
@@ -975,7 +997,7 @@ Now generate your daily briefing:"""
             raise HTTPException(status_code=500, detail=f"Failed to generate briefing: {str(e)}")
 
         # Convert to audio and upload to GCS
-        
+
         print("[daily-brief] Converting text to audio...")
         """what audio bytes does is check if text lenght > 4000 bytes, if so
         split into chunks.
@@ -999,7 +1021,7 @@ Now generate your daily briefing:"""
         Uploads the audio to ac215-audio-bucket
         Sets cache control & signed URL (who can access, how long the audio file lives for inside bucket)
         Returns URL (audio_url)
-        
+
         """
         audio_url = upload_audio_to_gcs(audio_bytes, user_id, filename_prefix="daily-brief")
 
@@ -1011,12 +1033,7 @@ Now generate your daily briefing:"""
         # [Z] save the chunks for storage (for context-aware Q&A)
         chunks_data = {
             "chunks": [
-                {
-                    "chunk_id": chunk_id,
-                    "chunk_text": chunk_text,
-                    "source_type": source_type,
-                    "score": float(score)
-                }
+                {"chunk_id": chunk_id, "chunk_text": chunk_text, "source_type": source_type, "score": float(score)}
                 for chunk_id, chunk_text, source_type, score in chunks
             ]
         }
@@ -1028,7 +1045,7 @@ Now generate your daily briefing:"""
             question_text="Daily Brief",
             podcast_text=podcast_text,
             audio_url=audio_url,
-            source_chunks=json.dumps(chunks_data)  # NEW: Save chunks for context-aware Q&A
+            source_chunks=json.dumps(chunks_data),  # NEW: Save chunks for context-aware Q&A
         )
         # [Z] GCS bucket also keeps track of q+a audio files for each user
 
@@ -1036,14 +1053,14 @@ Now generate your daily briefing:"""
         current_time = datetime.now(timezone.utc).isoformat()
         save_user_preferences(user_id, {"last_daily_brief_generated": current_time})
 
-        print(f"[daily-brief] Successfully generated and saved")
-        #return the success of generating daily brief to frontend via Websocket
+        print("[daily-brief] Successfully generated and saved")
+        # return the success of generating daily brief to frontend via Websocket
         return {
             "success": True,
             "podcast_text": podcast_text,
             "audio_url": audio_url,
             "created_at": current_time,
-            "voice_only_update": False
+            "voice_only_update": False,
         }
 
     except HTTPException:
@@ -1053,13 +1070,14 @@ Now generate your daily briefing:"""
     except Exception as e:
         print(f"[daily-brief-error] {e}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to generate daily brief: {str(e)}")
 
 
-#we check status first to avoid regenerating the same brief multiple times
-#one brief per user per day
-#podcast page CHECKS this endpoint on load to avoid re-generating if already done today
+# we check status first to avoid regenerating the same brief multiple times
+# one brief per user per day
+# podcast page CHECKS this endpoint on load to avoid re-generating if already done today
 @app.get("/api/daily-brief/status")
 async def check_daily_brief_status_endpoint(request: Request):
     """Check if daily brief was generated today and if preferences have been updated since."""
@@ -1081,35 +1099,41 @@ async def check_daily_brief_status_endpoint(request: Request):
         if last_generated_str:
             # Parse timestamp and check if it's today
             try:
-                last_generated = datetime.fromisoformat(last_generated_str.replace('Z', '+00:00'))
+                last_generated = datetime.fromisoformat(last_generated_str.replace("Z", "+00:00"))
                 today = datetime.now(timezone.utc).date()
                 last_date = last_generated.date()
-                generated_today = (last_date == today)
+                generated_today = last_date == today
 
                 # Check if content preferences (topics/sources) were updated after last brief
                 if preferences_updated_str:
                     try:
-                        prefs_updated = datetime.fromisoformat(preferences_updated_str.replace('Z', '+00:00'))
+                        prefs_updated = datetime.fromisoformat(preferences_updated_str.replace("Z", "+00:00"))
                         if prefs_updated > last_generated:
                             preferences_changed = True
-                            print(f"[daily-brief-status] Content preferences updated after last brief: {prefs_updated} > {last_generated}")
+                            print(
+                                f"[daily-brief-status] Content preferences updated after last brief:"
+                                f" {prefs_updated} > {last_generated}"
+                            )
                     except (ValueError, AttributeError):
                         pass
-                
+
                 # Check if only voice changed (voice updated but content preferences not)
                 if voice_pref_updated_str and preferences_updated_str:
                     try:
-                        voice_updated = datetime.fromisoformat(voice_pref_updated_str.replace('Z', '+00:00'))
-                        content_updated = datetime.fromisoformat(preferences_updated_str.replace('Z', '+00:00'))
+                        voice_updated = datetime.fromisoformat(voice_pref_updated_str.replace("Z", "+00:00"))
+                        content_updated = datetime.fromisoformat(preferences_updated_str.replace("Z", "+00:00"))
                         if voice_updated > last_generated and content_updated <= last_generated:
                             voice_only_changed = True
-                            print(f"[daily-brief-status] Only voice preference changed: {voice_updated} > {last_generated}, content unchanged")
+                            print(
+                                f"[daily-brief-status] Only voice preference changed:"
+                                f" {voice_updated} > {last_generated}, content unchanged"
+                            )
                     except (ValueError, AttributeError):
                         pass
                 elif voice_pref_updated_str:
                     # If voice was updated but we don't have content update time, check voice only
                     try:
-                        voice_updated = datetime.fromisoformat(voice_pref_updated_str.replace('Z', '+00:00'))
+                        voice_updated = datetime.fromisoformat(voice_pref_updated_str.replace("Z", "+00:00"))
                         if voice_updated > last_generated:
                             voice_only_changed = True
                             print(f"[daily-brief-status] Voice preference changed: {voice_updated} > {last_generated}")
@@ -1124,7 +1148,7 @@ async def check_daily_brief_status_endpoint(request: Request):
             "preferences_changed": preferences_changed,
             "voice_only_changed": voice_only_changed,
             "last_generated": last_generated_str,
-            "preferences_updated": preferences_updated_str
+            "preferences_updated": preferences_updated_str,
         }
 
     except AttributeError:
@@ -1133,7 +1157,8 @@ async def check_daily_brief_status_endpoint(request: Request):
         print(f"[daily-brief-status-error] {e}")
         raise HTTPException(status_code=500, detail=f"Failed to check status: {str(e)}")
 
-#retrieve most recent daily brief from user's history to display existing brief without regenerating
+
+# retrieve most recent daily brief from user's history to display existing brief without regenerating
 @app.get("/api/daily-brief/latest")
 async def get_latest_daily_brief_endpoint(request: Request):
     """Get the most recent daily brief from history."""
@@ -1157,7 +1182,7 @@ async def get_latest_daily_brief_endpoint(request: Request):
             "question_text": latest_brief.get("question_text"),
             "podcast_text": latest_brief.get("podcast_text"),
             "audio_url": latest_brief.get("audio_url"),
-            "created_at": latest_brief.get("created_at")
+            "created_at": latest_brief.get("created_at"),
         }
 
     except HTTPException:

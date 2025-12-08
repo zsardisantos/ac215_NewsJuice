@@ -1,5 +1,5 @@
 import os
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 # ============= ENV SETUP =============
@@ -72,11 +72,16 @@ def test_get_preferences_success(mock_get_prefs, mock_verify_token):
     assert response.json() == {"status": "success", "preferences": {"theme": "dark"}}
 
 
+@patch("psycopg.connect")
 @patch("main.verify_token")
 @patch("main.save_user_preferences")
-def test_save_preferences_success(mock_save_prefs, mock_verify_token):
+@patch("main.create_user")
+def test_save_preferences_success(
+    mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect
+):
     """Test 5: Save preferences - Success"""
     mock_verify_token.return_value = {"uid": "test_uid"}
+    mock_create_user.return_value = True
     mock_save_prefs.return_value = True
 
     headers = {"Authorization": "Bearer valid_token"}
@@ -203,11 +208,16 @@ def test_create_user_db_failure(mock_create_user, mock_verify_token):
     assert "Failed to create user" in response.json()["detail"]
 
 
+@patch("psycopg.connect")
 @patch("main.verify_token")
 @patch("main.save_user_preferences")
-def test_save_preferences_failure(mock_save_prefs, mock_verify_token):
+@patch("main.create_user")
+def test_save_preferences_failure(
+    mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect
+):
     """Test 13: Save preferences - Database Failure"""
     mock_verify_token.return_value = {"uid": "test_uid"}
+    mock_create_user.return_value = True
     mock_save_prefs.return_value = False  # DB Failure
 
     headers = {"Authorization": "Bearer valid_token"}
@@ -216,3 +226,63 @@ def test_save_preferences_failure(mock_save_prefs, mock_verify_token):
 
     assert response.status_code == 500
     assert "Failed to save preferences" in response.json()["detail"]
+
+
+@patch("main.verify_token")
+@patch("main.get_user_preferences")
+@patch("main.get_preferences_last_updated")
+@patch("main.get_voice_preference_last_updated")
+@patch("main.search_articles_by_preferences")
+@patch("main.model")
+@patch("main.text_to_audio_bytes")
+@patch("main.upload_audio_to_gcs")
+@patch("main.save_user_preferences")
+@patch("main.save_audio_history")
+def test_generate_daily_brief_success(
+    mock_save_history,
+    mock_save_prefs,
+    mock_upload,
+    mock_tts,
+    mock_model_instance,
+    mock_search,
+    mock_voice_updated,
+    mock_prefs_updated,
+    mock_get_prefs,
+    mock_verify_token,
+):
+    """Test 14: Generate Daily Brief - Success"""
+    # 1. Auth Setup
+    mock_verify_token.return_value = {"uid": "test_uid"}
+    
+    # 2. Prefs Setup
+    mock_get_prefs.return_value = {
+        "topics": '["Harvard"]', 
+        "sources": '["Gazette"]',
+        "voice_preference": "Alloy"
+    }
+    mock_prefs_updated.return_value = "2024-01-01T00:00:00Z"
+    mock_voice_updated.return_value = "2024-01-01T00:00:00Z"
+    
+    # Mock save history/prefs return values
+    mock_save_history.return_value = True
+    mock_save_prefs.return_value = True
+
+    # 3. Search Setup (Chunks found)
+    mock_search.return_value = [("id1", "Chunk Content", "Source", 0.9)]
+
+    # 4. Gemini Setup (mocking the global 'model' instance directly)
+    mock_model_instance.generate_content.return_value.text = "Good morning Harvard."
+
+    # 5. TTS & Upload Setup
+    mock_tts.return_value = b"fake_audio_bytes"
+    mock_upload.return_value = "https://gcs/audio.mp3"
+
+    headers = {"Authorization": "Bearer valid_token"}
+    response = client.post("/api/daily-brief", headers=headers)
+
+    # Assertions
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["audio_url"] == "https://gcs/audio.mp3"
+    assert data["podcast_text"] == "Good morning Harvard."

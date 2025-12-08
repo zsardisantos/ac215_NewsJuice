@@ -82,16 +82,13 @@ def call_gemini_api(
                 print(f"[gemini-debug] First chunk structure: {context_articles[0]}")
                 print(f"[gemini-debug] First chunk types: {[type(x) for x in context_articles[0]]}")
         else:
-            print(f"[gemini-debug] context_articles is None!")
+            print("[gemini-debug] context_articles is None!")
 
         # Build the prompt with context if articles are provided
         if context_articles:
-            print(f"[gemini-debug] Using WITH-CONTEXT prompt (if block)")
+            print("[gemini-debug] Using WITH-CONTEXT prompt (if block)")
             context_text = "\n\n".join(
-                [
-                    f"Article Title: {source_type}\n{chunk}"
-                    for _, chunk, source_type, score in context_articles
-                ]
+                [f"Article Title: {source_type}\n{chunk}" for _, chunk, source_type, score in context_articles]
             )
 
             print(f"[gemini-debug] Built context_text with {len(context_text)} characters")
@@ -109,7 +106,8 @@ LISTENER'S QUESTION: {question}
 SITUATION: No relevant Harvard news articles were found in the database for this topic.
 
 YOUR TASK:
-Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database. Do NOT ask the listener for more information or engage in collaborative conversation.
+Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database.
+Do NOT ask the listener for more information or engage in collaborative conversation.
 
 RESPONSE STRUCTURE:
 1. Acknowledge the question directly
@@ -124,11 +122,14 @@ DELIVERY STYLE:
 - Keep it brief: 50-75 words maximum
 
 EXAMPLE RESPONSE:
-"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
+"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on
+ Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy
+  changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
 
 Now generate your response:"""
             else:
-                prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University. Your role is to deliver factual, informative summaries based on news article chunks.
+                prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University. Your role is to
+                deliver factual, informative summaries based on news article chunks.
 
 LISTENER'S QUESTION: {question}
 
@@ -141,12 +142,17 @@ YOUR TASK:
 3. Present information authoritatively - you are delivering news, not seeking clarification
 4. Structure your response with these elements:
    - OPENING: Directly state the answer to the question
-   - KEY FACTS: Present the most important details with specific numbers, names, and dates. BE SURE TO MENTION THE ARTICLE SOURCE (NEWS TITLE) THE KEY FACT DERIVES FROM WHEN STATING THE KEY FACT.
+   - KEY FACTS: Present the most important details with specific numbers, names, and dates. BE SURE TO MENTION THE
+    ARTICLE SOURCE (NEWS TITLE) THE KEY FACT DERIVES FROM WHEN STATING THE KEY FACT.
    - CONTEXT: Provide background information and explain implications
    - CLOSING: Brief summary statement (NO invitation for follow-up questions)
 5. Target 50 words for a comprehensive answer
-6. IMPORTANT: You may make reasonable inferences and draw connections from related information in the articles. If the articles contain relevant context, related topics, or similar subject matter, use that information to provide a helpful answer. Be flexible in interpreting what counts as "relevant" - synonyms, related concepts, and contextual information all count.
-7. ONLY state "The latest Harvard news I have doesn't cover that topic in detail" if the articles are completely unrelated or irrelevant to the question (e.g., asking about sports when only economics articles are provided).
+6. IMPORTANT: You may make reasonable inferences and draw connections from related information in the articles.
+ If the articles contain relevant context, related topics, or similar subject matter, use that information to provide
+  a helpful answer. Be flexible in interpreting what counts as "relevant" - synonyms, related concepts, and contextual
+   information all count.
+7. ONLY state "The latest Harvard news I have doesn't cover that topic in detail" if the articles are completely
+unrelated or irrelevant to the question (e.g., asking about sports when only economics articles are provided).
 
 DELIVERY STYLE:
 - Professional but conversational tone
@@ -161,11 +167,19 @@ DELIVERY STYLE:
 - Example: "According to the Harvard Gazette article 'Budget Cuts Impact Research,' the university..."
 
 EXAMPLE STRUCTURE:
-"Harvard is facing significant budget challenges this year. According to recent reports, the university posted a $113 million operating deficit in fiscal year 2025 - its first since 2020. This deficit stems from multiple factors, including the Trump administration's temporary termination of nearly all federal research grants in spring 2025, which removed approximately $116 million in sponsored funds overnight. To address these shortfalls, Harvard has implemented several cost-cutting measures: freezing salaries for non-union staff, leaving positions unfilled, and conducting targeted workforce reductions including 38 IT workers in November. The situation is compounded by a scheduled 400 percent increase in the federal endowment tax taking effect in 2027. Despite these challenges, Harvard's endowment grew 11.9 percent to $56.9 billion in fiscal 2025, which financial officers credit as central to navigating this uncertain period."
+"Harvard is facing significant budget challenges this year. According to recent reports, the university posted
+ a $113 million operating deficit in fiscal year 2025 - its first since 2020. This deficit stems from multiple factors,
+  including the Trump administration's temporary termination of nearly all federal research grants in spring 2025,
+   which removed approximately $116 million in sponsored funds overnight. To address these shortfalls,
+    Harvard has implemented several cost-cutting measures: freezing salaries for non-union staff,
+    leaving positions unfilled, and conducting targeted workforce reductions including 38 IT workers in November.
+    The situation is compounded by a scheduled 400 percent increase in the federal endowment tax taking effect in
+    2027. Despite these challenges, Harvard's endowment grew 11.9 percent to $56.9 billion in fiscal 2025,
+    which financial officers credit as central to navigating this uncertain period."
 
 Now generate your podcast segment answering the listener's question:"""
         else:
-            print(f"[gemini-debug] Using NO-CONTEXT prompt (else block)")
+            print("[gemini-debug] Using NO-CONTEXT prompt (else block)")
             prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University.
 
 LISTENER'S QUESTION: {question}
@@ -173,7 +187,8 @@ LISTENER'S QUESTION: {question}
 SITUATION: No relevant Harvard news articles were found in the database for this topic.
 
 YOUR TASK:
-Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database. Do NOT ask the listener for more information or engage in collaborative conversation.
+Deliver a brief, authoritative response stating that this topic is not currently covered in the Harvard news database.
+Do NOT ask the listener for more information or engage in collaborative conversation.
 
 RESPONSE STRUCTURE:
 1. Acknowledge the question directly
@@ -188,7 +203,9 @@ DELIVERY STYLE:
 - Keep it brief: 50-75 words maximum
 
 EXAMPLE RESPONSE:
-"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
+"I don't currently have recent Harvard news covering that specific topic in my database. My coverage focuses on
+Harvard's academic programs, administrative developments, research initiatives, campus news, and university policy
+changes. For information on this topic, you may want to check the Harvard Gazette or Crimson directly."
 
 Now generate your response:"""
 
@@ -196,7 +213,6 @@ Now generate your response:"""
         return response.text, None
     except Exception as e:
         return None, str(e)
-
 
 
 def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our current workflow.
@@ -259,6 +275,7 @@ def log_conversation(
 
 # [NEW] Context-Aware Q&A Helper Functions
 
+
 def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
     """
     Fetch today's daily brief context (transcript + chunks) for context-aware Q&A.
@@ -290,7 +307,7 @@ def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
             if entry.get("question_text") == "Daily Brief":
                 created_at = entry.get("created_at")
                 if isinstance(created_at, str):
-                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
 
                 if created_at.date() == today:
                     # Found today's brief
@@ -305,7 +322,12 @@ def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
 
                     # Debug logging for chunk format verification
                     print(f"[brief-debug] chunks_data type: {type(chunks_data)}")
-                    print(f"[brief-debug] chunks_data keys: {chunks_data.keys() if isinstance(chunks_data, dict) else 'not a dict'}")
+                    print(
+                        "[brief-debug] chunks_data keys:",
+                        chunks_data.keys()
+                        if isinstance(chunks_data, dict)
+                        else "not a dict"
+                    )
                     if chunks_data.get("chunks"):
                         print(f"[brief-debug] Number of chunks in chunks_data: {len(chunks_data['chunks'])}")
                         print(f"[brief-debug] First chunk from DB: {chunks_data['chunks'][0]}")
@@ -313,13 +335,14 @@ def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
                     return {
                         "id": entry.get("id"),
                         "transcript": entry.get("podcast_text", ""),
-                        "chunks": chunks_data.get("chunks", [])
+                        "chunks": chunks_data.get("chunks", []),
                     }
 
         return None
     except Exception as e:
         print(f"[brief-context-error] {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
@@ -340,10 +363,11 @@ def classify_question_context(question: str, brief_transcript: str, model) -> st
     try:
         # Use more of the transcript for better matching (up to 2000 chars)
         brief_summary = brief_transcript[:2000] if len(brief_transcript) > 2000 else brief_transcript
-        #perhaps pass the entire brief or the chunks themselves instead of brief 
+        # perhaps pass the entire brief or the chunks themselves instead of brief
 
         # Create classification prompt with emphasis on name/entity matching
-        prompt = f"""You are analyzing a user's question to determine if it relates to a daily news briefing they just heard.
+        prompt = f"""You are analyzing a user's question to determine if it relates to a daily news briefing they just
+        heard.
 
 DAILY BRIEF CONTENT:
 {brief_summary}
@@ -356,7 +380,8 @@ Determine if the user's question is asking about ANY content mentioned in the da
 
 IMPORTANT INSTRUCTIONS:
 1. Check if ANY person names, places, topics, or events in the question appear in the brief
-2. Look for partial matches - if the question mentions "Amanda Claybaugh" and the brief mentions that name, it's CONTEXTUAL
+2. Look for partial matches - if the question mentions "Amanda Claybaugh" and the brief mentions that name,
+then it's CONTEXTUAL
 3. If the question asks for more details about ANYTHING mentioned in the brief, it's CONTEXTUAL
 4. Questions with pronouns like "what did you say about..." or "tell me more about..." are usually CONTEXTUAL
 5. Only classify as GENERAL if the topic is completely absent from the brief
@@ -380,10 +405,10 @@ Respond with ONLY ONE word - either "CONTEXTUAL" or "GENERAL":"""
 
         # Validate response
         if "CONTEXTUAL" in classification:
-            print(f"[classification] ✓ Question is CONTEXTUAL to daily brief")
+            print("[classification] ✓ Question is CONTEXTUAL to daily brief")
             return "CONTEXTUAL"
         elif "GENERAL" in classification:
-            print(f"[classification] ✗ Question is GENERAL (not related to brief)")
+            print("[classification] ✗ Question is GENERAL (not related to brief)")
             return "GENERAL"
         else:
             # Default to general if unclear
@@ -393,5 +418,6 @@ Respond with ONLY ONE word - either "CONTEXTUAL" or "GENERAL":"""
     except Exception as e:
         print(f"[classification-error] {e}, defaulting to GENERAL")
         import traceback
+
         traceback.print_exc()
         return "GENERAL"

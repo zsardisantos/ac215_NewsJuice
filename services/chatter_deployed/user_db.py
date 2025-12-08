@@ -4,7 +4,6 @@ import os
 import psycopg
 from typing import Optional, Dict, List
 import json
-from datetime import datetime
 
 DB_URL = os.environ.get("DATABASE_URL")
 if not DB_URL:
@@ -26,8 +25,9 @@ def create_user(user_id: str, email: str) -> bool:
         print(f"[db-error] Failed to create user: {e}")
         return False
 
-#user_db.py function, get_user_preferences. This literally grabs the user_prefernece
-#values from the user_preferences table in our CloudSQL db. 
+
+# user_db.py function, get_user_preferences. This literally grabs the user_prefernece
+# values from the user_preferences table in our CloudSQL db.
 def get_user_preferences(user_id: str) -> Dict[str, str]:
     "Get all preferences for a user."
     try:
@@ -46,11 +46,13 @@ def get_user_preferences(user_id: str) -> Dict[str, str]:
         print(f"[db-error] Failed to get preferences: {e}")
         return {}
 
-#save user preferences which inserts the user preferred topics + sources into the user_preferences table
+
+# save user preferences which inserts the user preferred topics + sources into the user_preferences table
+
 
 def save_user_preferences(user_id: str, preferences: Dict[str, str]) -> bool:
     """Save user preferences (upsert).
-    
+
     Only updates updated_at timestamp if the value actually changed.
     This prevents false positives when only voice preference changes.
     """
@@ -61,16 +63,16 @@ def save_user_preferences(user_id: str, preferences: Dict[str, str]) -> bool:
                     # Convert lists/dicts to JSON strings
                     if isinstance(value, (list, dict)):
                         value = json.dumps(value)
-                    
+
                     value_str = str(value)
-                    
+
                     # Check if value actually changed
                     cur.execute(
                         "SELECT preference_value FROM user_preferences WHERE user_id = %s AND preference_key = %s",
-                        (user_id, key)
+                        (user_id, key),
                     )
                     existing = cur.fetchone()
-                    
+
                     # Only update timestamp if value changed
                     if existing and existing[0] == value_str:
                         # Value unchanged, don't update timestamp - use UPDATE without changing updated_at
@@ -155,7 +157,7 @@ def get_audio_history(user_id: str, limit: int = 10) -> List[Dict]:
 
 def get_preferences_last_updated(user_id: str) -> Optional[str]:
     """Get the most recent updated_at timestamp for topics or sources preferences.
-    
+
     Returns:
         ISO format timestamp string, or None if no preferences exist
     """
@@ -164,9 +166,9 @@ def get_preferences_last_updated(user_id: str) -> Optional[str]:
             with conn.cursor() as cur:
                 # Get max updated_at for topics or sources (the preference keys that affect daily brief)
                 cur.execute(
-                    """SELECT MAX(updated_at) 
-                       FROM user_preferences 
-                       WHERE user_id = %s 
+                    """SELECT MAX(updated_at)
+                       FROM user_preferences
+                       WHERE user_id = %s
                        AND preference_key IN ('topics', 'sources')""",
                     (user_id,),
                 )
@@ -181,7 +183,7 @@ def get_preferences_last_updated(user_id: str) -> Optional[str]:
 
 def get_voice_preference_last_updated(user_id: str) -> Optional[str]:
     """Get the updated_at timestamp for voice_preference.
-    
+
     Returns:
         ISO format timestamp string, or None if voice preference doesn't exist
     """
@@ -189,9 +191,9 @@ def get_voice_preference_last_updated(user_id: str) -> Optional[str]:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """SELECT updated_at 
-                       FROM user_preferences 
-                       WHERE user_id = %s 
+                    """SELECT updated_at
+                       FROM user_preferences
+                       WHERE user_id = %s
                        AND preference_key = 'voice_preference'""",
                     (user_id,),
                 )

@@ -118,6 +118,7 @@ def get_db_connection():
     register_vector(conn)
     return conn
 
+
 # [Z] this function should really be called get_chunks; it searches the articles table
 # with the query search string (SQL command) and pulls most relevant chunks
 def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, str, float]]:
@@ -171,6 +172,7 @@ def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, str, fl
     except Exception as e:
         print(f"[retriever] Error searching articles: {e}")
         import traceback
+
         traceback.print_exc()
         return []
 
@@ -179,39 +181,40 @@ def search_articles(query: str, limit: int = 10) -> List[Tuple[int, str, str, fl
 # Use search_articles(query, limit) function directly
 # No standalone mode - only function-based API
 
+
 def search_articles_by_preferences(
-        topics: List[str],
-        sources: List[str],
-        limit: int = 30,
-        days_back: int = 2 #only search recent articles for the daily briefing
-) -> List[Tuple[int, str, str, float]]: #returns the id of the chunk, the actual chunk, the source, similarity score
+    topics: List[str],
+    sources: List[str],
+    limit: int = 30,
+    days_back: int = 2,  # only search recent articles for the daily briefing
+) -> List[Tuple[int, str, str, float]]:  # returns the id of the chunk, the actual chunk, the source, similarity score
     """
     Retrieve recent articles matching user preferences.
-    
+
     Args:
         topics: List of topic keywords to search for (e.g., ["Politics", "Technology"])
         sources: List of source_type values to filter by (e.g., ["Harvard Gazette"])
         limit: Max number of chunks to return
         days_back: How many days back to search for recent articles
-        
-    Returns: 
+
+    Returns:
         List of tuples: (id, chunk, source_type, score)
     """
     try:
-        #create broad query from topics for semantic rankoing
-        topic_query = " ".join(topics) #ex is "politics technology health"
+        # create broad query from topics for semantic rankoing
+        topic_query = " ".join(topics)  # ex is "politics technology health"
         print(f"[retriever] Generating embedding for topics: {topic_query}")
 
-        #generate embedding for topic query
+        # generate embedding for topic query
         vertex_embedder = VertexEmbeddings()
         embedding = Vector(vertex_embedder.embed_query(topic_query))
 
-        #connect to chunks_vector db
+        # connect to chunks_vector db
         conn = psycopg.connect(DB_URL, autocommit=True)
         register_vector(conn)
         cursor = conn.cursor()
 
-        #SQL query the DB w/ category filtering + semantic rankong
+        # SQL query the DB w/ category filtering + semantic rankong
         '''select_sql = sql.SQL("""
                              SELECT id, chunk, source_type, embedding <=> %s AS score
                              FROM {table}
@@ -226,8 +229,9 @@ def search_articles_by_preferences(
         print(f"[retriever] Filtering by categories: {topics}")
         print(f"[retriever] Limiting to {limit} chunks")'''
 
-        ########test with no category filtering#########
-        select_sql = sql.SQL("""
+        # ########test with no category filtering#########
+        select_sql = sql.SQL(
+            """
                              SELECT id, chunk, source_type, embedding <=> %s AS score
                              FROM {table}
                              WHERE source_type = ANY(%s)
@@ -235,7 +239,8 @@ def search_articles_by_preferences(
                                 embedding <=> %s,
                                 id DESC
                              LIMIT %s;
-                            """).format(table=sql.Identifier(VECTOR_TABLE_NAME))
+                            """
+        ).format(table=sql.Identifier(VECTOR_TABLE_NAME))
         print(f"[retriever] Filtering by sources: {sources}")
         print(f"[retriever] Filtering by categories: {topics}")
         print(f"[retriever] Limiting to {limit} chunks")
@@ -243,18 +248,16 @@ def search_articles_by_preferences(
         # Execute query
         cursor.execute(select_sql, (embedding, sources, embedding, limit))
         results = cursor.fetchall()
-        
+
         cursor.close()
         conn.close()
-        
+
         print(f"[retriever] Found {len(results)} chunks matching preferences")
-        
+
         # Return as list of tuples: (id, chunk, source_type, score)
         return results
-        
+
     except Exception as e:
         print(f"[retriever-error] Failed to search by preferences: {e}")
         traceback.print_exc()
         return []
-        
-    
