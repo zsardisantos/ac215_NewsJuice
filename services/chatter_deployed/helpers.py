@@ -324,9 +324,7 @@ def get_daily_brief_context(user_id: str) -> Optional[Dict[str, Any]]:
                     print(f"[brief-debug] chunks_data type: {type(chunks_data)}")
                     print(
                         "[brief-debug] chunks_data keys:",
-                        chunks_data.keys()
-                        if isinstance(chunks_data, dict)
-                        else "not a dict"
+                        chunks_data.keys() if isinstance(chunks_data, dict) else "not a dict",
                     )
                     if chunks_data.get("chunks"):
                         print(f"[brief-debug] Number of chunks in chunks_data: {len(chunks_data['chunks'])}")

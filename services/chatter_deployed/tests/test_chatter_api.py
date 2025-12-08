@@ -1,5 +1,5 @@
 import os
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 
 # ============= ENV SETUP =============
@@ -76,9 +76,7 @@ def test_get_preferences_success(mock_get_prefs, mock_verify_token):
 @patch("main.verify_token")
 @patch("main.save_user_preferences")
 @patch("main.create_user")
-def test_save_preferences_success(
-    mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect
-):
+def test_save_preferences_success(mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect):
     """Test 5: Save preferences - Success"""
     mock_verify_token.return_value = {"uid": "test_uid"}
     mock_create_user.return_value = True
@@ -212,9 +210,7 @@ def test_create_user_db_failure(mock_create_user, mock_verify_token):
 @patch("main.verify_token")
 @patch("main.save_user_preferences")
 @patch("main.create_user")
-def test_save_preferences_failure(
-    mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect
-):
+def test_save_preferences_failure(mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect):
     """Test 13: Save preferences - Database Failure"""
     mock_verify_token.return_value = {"uid": "test_uid"}
     mock_create_user.return_value = True
@@ -253,16 +249,12 @@ def test_generate_daily_brief_success(
     """Test 14: Generate Daily Brief - Success"""
     # 1. Auth Setup
     mock_verify_token.return_value = {"uid": "test_uid"}
-    
+
     # 2. Prefs Setup
-    mock_get_prefs.return_value = {
-        "topics": '["Harvard"]', 
-        "sources": '["Gazette"]',
-        "voice_preference": "Alloy"
-    }
+    mock_get_prefs.return_value = {"topics": '["Harvard"]', "sources": '["Gazette"]', "voice_preference": "Alloy"}
     mock_prefs_updated.return_value = "2024-01-01T00:00:00Z"
     mock_voice_updated.return_value = "2024-01-01T00:00:00Z"
-    
+
     # Mock save history/prefs return values
     mock_save_history.return_value = True
     mock_save_prefs.return_value = True
