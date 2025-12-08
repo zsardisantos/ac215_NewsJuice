@@ -199,10 +199,18 @@ jobs:
         working-directory: services/deployment
         env:
           PULUMI_CONFIG_PASSPHRASE: ""
-          PULUMI_PYTHON_CMD: python
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
         run: |
+          cat > Pulumi.yaml << 'EOF'
+          name: newsjuice-loader
+          runtime:
+            name: python
+            options:
+              toolchain: pip
+          description: NewsJuice Loader Service with Cloud SQL PostgreSQL
+          EOF
+          
           pulumi stack select dev --create
           pulumi up --yes --skip-preview
 
