@@ -2,17 +2,6 @@
 name: CI - Combined Test Suite (All Services)
 
 on:
-  push:
-    paths:
-      - 'services/loader_testing/**'
-      - 'services/scraper_deployed/**'
-      - 'services/chatter_deployed/**'
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'services/loader_testing/**'
-      - 'services/scraper_deployed/**'
-      - 'services/chatter_deployed/**'
   workflow_dispatch:
 
 jobs:
