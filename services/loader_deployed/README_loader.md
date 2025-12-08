@@ -6,8 +6,6 @@
 - uses Vertex AI ("text-embedding-004") for final chunk embeddings
 
 
-
-
 Uses Vertex AI for embeddings of the chunks
 **Chunking option available**
 - `char-split` character splitting
