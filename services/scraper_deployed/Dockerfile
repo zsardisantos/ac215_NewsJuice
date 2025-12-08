@@ -8,7 +8,7 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends build-essential ffmpeg && \
+    apt-get install -y --no-install-recommends build-essential ffmpeg curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

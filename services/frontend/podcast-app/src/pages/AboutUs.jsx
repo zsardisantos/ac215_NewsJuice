@@ -6,26 +6,26 @@ function AboutUs() {
 
   const teamMembers = [
     {
-      name: 'Avery Smith',
-      role: 'CEO & Founder',
+      name: 'Zac',
+      role: 'Frontend Master of the Universe I',
       bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
       image: '👤'
     },
     {
-      name: 'Jordan Lee',
-      role: 'Lead AI Engineer',
+      name: 'Josh',
+      role: 'Frontend Master of the Universe II',
       bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
       image: '👤'
     },
     {
-      name: 'Taylor Brown',
-      role: 'Product Designer',
+      name: 'Khaled',
+      role: 'Master Scraper, Tester and Gitter',
       bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
       image: '👤'
     },
     {
-      name: 'Morgan Davis',
-      role: 'Content Strategist',
+      name: 'Chris',
+      role: 'Deploying is my mission',
       bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
       image: '👤'
     }

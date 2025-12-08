@@ -4,6 +4,7 @@ import Registration from './pages/Registration'
 import Podcast from './pages/Podcast'
 import AboutUs from './pages/AboutUs'
 import Settings from './pages/Settings'
+import Preferences from './pages/Preferences'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/podcast" element={<Podcast />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/preferences" element={<Preferences />} />
       </Routes>
     </Router>
   )

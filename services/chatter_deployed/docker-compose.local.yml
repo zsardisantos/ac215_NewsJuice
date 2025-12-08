@@ -68,10 +68,16 @@ services:
       
       # Optional: Mount code for hot-reload during development
       # Uncomment these lines if you want to edit code without rebuilding
-      # - ./main.py:/app/main.py
+      - ./main.py:/app/main.py
       # - ./chatter_handler.py:/app/chatter_handler.py
-      # - ./helpers.py:/app/helpers.py
-      # - ./retriever.py:/app/retriever.py
+      - ./helpers.py:/app/helpers.py
+      - ./retriever.py:/app/retriever.py
+      - ./text_to_speech_client.py:/app/text_to_speech_client.py
+      - ./user_db.py:/app/user_db.py
+      - ./firebase_auth.py:/app/firebase_auth.py
+      - ./query_enhancement.py:/app/query_enhancement.py
+      - ./speech_to_text_client.py:/app/speech_to_text_client.py
+      - ./gcs_storage.py:/app/gcs_storage.py
     
     restart: unless-stopped
     networks:

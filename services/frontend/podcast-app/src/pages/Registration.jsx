@@ -57,10 +57,16 @@ function Registration() {
 
       // Create user in CloudSQL
       try {
+        //const backendUrl = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+        //  ? 'http://136.113.170.71'
+        //  : 'http://136.113.170.71';
+
+
         const backendUrl = window.location.hostname.includes('newsjuiceapp.com')
-          ? 'https://chatter-919568151211.us-central1.run.app'
+          ? ''
           : 'http://localhost:8080';
         
+
         const response = await fetch(`${backendUrl}/api/user/create`, {
           method: 'POST',
           headers: {

@@ -1,0 +1,6 @@
+name: newsjuice-loader
+runtime:
+  name: python
+  options:
+    virtualenv: /home/app/.venv
+description: NewsJuice Loader Service with Cloud SQL PostgreSQL

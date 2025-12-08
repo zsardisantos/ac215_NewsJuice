@@ -219,7 +219,7 @@ services/chatter_deployed/
 ├── speech_to_text_client.py         # Audio transcription
 ├── query_enhancement.py             # Query expansion with Gemini
 ├── retriever.py                     # Vector database retrieval
-├── live_api_tts_client.py           # Text-to-speech with Gemini Live API
+├── text_to_speech_client.py         # Text-to-speech with Google Cloud TTS API
 ├── helpers.py                       # Gemini API calls
 ├── user_db.py                       # User management (Cloud SQL)
 ├── firebase_auth.py                 # Firebase token verification

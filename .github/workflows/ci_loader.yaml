@@ -139,8 +139,8 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/services/loader_testing/src/api-service
           DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
           GOOGLE_CLOUD_PROJECT: test-project-ci
-          ARTICLES_TABLE_NAME: articles_test
-          VECTOR_TABLE_NAME: chunks_vector_test
+          ARTICLES_TABLE_NAME: articles
+          VECTOR_TABLE_NAME: chunks_vector
         run: |
           uv run python -m pytest tests/integration/ -v --no-cov
 

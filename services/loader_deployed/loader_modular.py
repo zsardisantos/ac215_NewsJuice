@@ -23,20 +23,25 @@ from langchain.text_splitter import (
     CharacterTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from langchain_experimental.text_splitter import SemanticChunker
 from pgvector.psycopg import register_vector
 
 logger = logging.getLogger(__name__)
 
 # ============= CONFIGURATION =============
-ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles_test")
-VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector_test")
+ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles")
+VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector")
 DB_URL = os.environ["DATABASE_URL"]
 EMBEDDING_MODEL = "text-embedding-004"
 EMBEDDING_DIM = 768
+
+# Character chunking settings
 CHUNK_SIZE_CHAR = 350
 CHUNK_OVERLAP_CHAR = 20
-CHUNK_SIZE_RECURSIVE = 350
+
+# Recursive chunking settings
+CHUNK_SIZE_RECURSIVE = 600
+CHUNK_OVERLAP_RECURSIVE = 50
+CHUNK_SEPARATORS = ["\n\n", "\n", ". ", "? ", "! ", " ", ""]
 
 
 # ============= DATA CLASSES =============
@@ -229,26 +234,17 @@ class CharacterChunking(ChunkingStrategy):
 class RecursiveChunking(ChunkingStrategy):
     """Recursive text splitting"""
 
-    def __init__(self, chunk_size: int = CHUNK_SIZE_RECURSIVE):
-        self.splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size)
-
-    def chunk_text(self, text: str) -> List[str]:
-        docs = self.splitter.create_documents([text or ""])
-        return [d.page_content for d in docs]
-
-
-class SemanticChunking(ChunkingStrategy):
-    """Semantic-based text splitting"""
-
-    def __init__(self, embeddings: VertexEmbeddings):
-        logger.info("Initializing semantic splitter with VertexEmbeddings")
-        self.splitter = SemanticChunker(
-            embeddings=embeddings,
-            breakpoint_threshold_type="percentile",
-            breakpoint_threshold_amount=90,
-            min_chunk_size=None,
+    def __init__(
+        self,
+        chunk_size: int = CHUNK_SIZE_RECURSIVE,
+        chunk_overlap: int = CHUNK_OVERLAP_RECURSIVE,
+        separators: List[str] = None,
+    ):
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separators=separators or CHUNK_SEPARATORS,
         )
-        logger.info("Semantic splitter initialized successfully")
 
     def chunk_text(self, text: str) -> List[str]:
         docs = self.splitter.create_documents([text or ""])
@@ -265,11 +261,7 @@ def get_chunking_strategy(
         "recursive-split": RecursiveChunking,
     }
 
-    if method == "semantic-split":
-        if embeddings is None:
-            raise ValueError("Semantic chunking requires embeddings")
-        return SemanticChunking(embeddings)
-    elif method in strategies:
+    if method in strategies:
         return strategies[method]()
     else:
         raise ValueError(f"Unknown chunking method: {method}")
@@ -344,7 +336,7 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
     Main orchestration function for chunking, embedding, and loading articles
 
     Args:
-        method: Chunking method ('char-split', 'recursive-split', 'semantic-split')
+        method: Chunking method ('char-split', 'recursive-split')
 
     Returns:
         Dictionary with processing results
@@ -356,9 +348,7 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
 
     # Initialize components
     embedder = VertexEmbeddings()
-    chunking_strategy = get_chunking_strategy(
-        method, embedder if method == "semantic-split" else None
-    )
+    chunking_strategy = get_chunking_strategy(method)
     processor = ArticleProcessor(chunking_strategy, embedder)
 
     # Process articles
@@ -404,10 +394,11 @@ def chunk_embed_load(method: str = "char-split") -> Dict[str, Any]:
 def main():
     """Entry point for standalone execution"""
     logger.info("Starting loader main function")
-    result = chunk_embed_load("semantic-split")
+    result = chunk_embed_load("recursive-split")
     print(f"Final result: {result}")
     logger.info(f"Loader main function completed: {result}")
 
 
 if __name__ == "__main__":
     main()
+    

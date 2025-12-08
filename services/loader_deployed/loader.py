@@ -18,8 +18,8 @@ vectors = emb.embed_documents(["text1", "text2"])
 import os
 
 # Table configuration from environment variables
-ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles_test")
-VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector_test")
+ARTICLES_TABLE_NAME = os.environ.get("ARTICLES_TABLE_NAME", "articles")
+VECTOR_TABLE_NAME = os.environ.get("VECTOR_TABLE_NAME", "chunks_vector")
 
 
 import pandas as pd
@@ -41,7 +41,7 @@ from google.genai import types
 # Langchain
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_experimental.text_splitter import SemanticChunker
+#from langchain_experimental.text_splitter import SemanticChunker
 
 # source: https://api.python.langchain.com/en/latest/text_splitter/langchain_experimental.text_splitter.SemanticChunker.html
 
@@ -59,9 +59,9 @@ EMBEDDING_DIM = 768  # 256
 
 # Parameter for chunking
 CHUNK_SIZE_CHAR = 350
-CHUNK_OVERLAP_CHAR = 20
-CHUNK_SIZE_RECURSIVE = 350
-
+CHUNK_OVERLAP_CHAR = 50
+CHUNK_SIZE_RECURSIVE = 600
+CHUNK_OVERLAP_RECURSIVE = 50
 # ============== CHANGE 1: ADD LOGGING ==============
 import logging
 
@@ -159,23 +159,23 @@ def chunk_embed_load(method="char-split"):
     # Prepare semantic splitter once (if requested)
     sem_splitter = None
     processed_count = 0
-    if method == "semantic-split":
+    #if method == "semantic-split":
         # ============== CHANGE 7: LOG SEMANTIC SPLITTER INIT ==============
-        logger.info("Initializing semantic splitter with VertexEmbeddings")
+    #    logger.info("Initializing semantic splitter with VertexEmbeddings")
         # ==================================================================
-        emb = VertexEmbeddings()
+     #   emb = VertexEmbeddings()
         # sem_splitter = SemanticChunker(embeddings=emb)
         # NEW VERSION WITH ALL PARAMETERS SET EXPLICITLY
-        sem_splitter = SemanticChunker(
-            embeddings=emb,
-            breakpoint_threshold_type="percentile",
-            breakpoint_threshold_amount=90,
-            min_chunk_size=None,
+     #   sem_splitter = SemanticChunker(
+      #      embeddings=emb,
+       #     breakpoint_threshold_type="percentile",
+        #    breakpoint_threshold_amount=90,
+         #   min_chunk_size=None,
             # max_chunk_size=None,
             # embedding_batch_size=100
-        )
+        #)
         # ============== CHANGE 8: LOG SPLITTER READY ==============
-        logger.info("Semantic splitter initialized successfully")
+        #logger.info("Semantic splitter initialized successfully")
         # ==========================================================
 
     # FE - Use this when using VERTEX AI for final embedding
@@ -224,7 +224,9 @@ def chunk_embed_load(method="char-split"):
 
         elif method == "recursive-split":
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=CHUNK_SIZE_RECURSIVE
+                chunk_size=CHUNK_SIZE_RECURSIVE,
+                chunk_overlap=CHUNK_OVERLAP_RECURSIVE,
+                separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""],
             )
             docs = text_splitter.create_documents([content or ""])
 
@@ -377,7 +379,7 @@ def main():
     logger.info("Starting loader main function")
     # =======================================================
 
-    result = chunk_embed_load("semantic-split")
+    result = chunk_embed_load("recursive-split")
     print(f"Final result: {result}")
 
     # ============== CHANGE 17: LOG MAIN COMPLETE ==============

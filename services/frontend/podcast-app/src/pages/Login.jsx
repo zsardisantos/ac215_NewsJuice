@@ -15,7 +15,7 @@ function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     try {
       // Firebase Auth login
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -23,13 +23,44 @@ function Login() {
 
       // Get JWT token
       const token = await user.getIdToken();
-      
+
       // Store token and user ID
       localStorage.setItem('auth_token', token);
       localStorage.setItem('user_id', user.uid);
-      // localStorage.setItem('auth_token', token);
-      // console.log("Token for testing:", token);  // ← This will print in console
-      
+
+      // Create user in CloudSQL (if not exists)
+      try {
+       // const backendUrl = window.location.hostname.includes('newsjuiceapp.com') || window.location.hostname === '34.28.40.119'
+       //   ? 'http://136.113.170.71'
+        //  : 'http://136.113.170.71';
+
+        const backendUrl = window.location.hostname.includes('newsjuiceapp.com')
+          ? ''
+          : 'http://localhost:8080';
+
+
+
+        const response = await fetch(`${backendUrl}/api/user/create`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+          console.error('[login] Failed to create user in backend:', errorData);
+          // Still navigate - user is created in Firebase, backend will retry later
+        } else {
+          const data = await response.json();
+          console.log('[login] User ensured in CloudSQL:', data);
+        }
+      } catch (error) {
+        console.error('[login] Error calling backend:', error);
+        // Still navigate - user is created in Firebase
+      }
+
       navigate('/podcast');
     } catch (error) {
       setError(error.message);
