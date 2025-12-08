@@ -1,4 +1,4 @@
-name: CI - Loader Tests Trigger Pulumi
+name: CI - Loader Tests New Folders
 
 on:
   push:
@@ -151,7 +151,7 @@ jobs:
         run: docker compose -f docker-compose.test.yml down -v
 
   # ============================================================
-  # DEPLOY - After all tests pass (push to main/develop or PR)
+  # DEPLOY - After all tests pass
   # ============================================================
   deploy:
     name: Deploy to GKE
@@ -161,43 +161,86 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      # ------------------------------------------------------
+      # CHANGE 1: Authenticate to Google Cloud
+      # WHY: Pulumi needs GCP credentials to create/update resources
+      # ------------------------------------------------------
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       
+      # ------------------------------------------------------
+      # CHANGE 2: Set up Cloud SDK (gcloud CLI)
+      # WHY: Needed to configure Docker auth and kubectl
+      # ------------------------------------------------------
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT }}
       
+      # ------------------------------------------------------
+      # CHANGE 3: Configure Docker for Artifact Registry
+      # WHY: Pulumi builds and pushes Docker images to GCR
+      # ------------------------------------------------------
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
       
+      # ------------------------------------------------------
+      # CHANGE 4: Install Pulumi CLI
+      # WHY: Need pulumi command to run deployments
+      # ------------------------------------------------------
       - name: Install Pulumi
         uses: pulumi/actions@v5
       
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-      
+      # ------------------------------------------------------
+      # CHANGE 5: Use standard Python setup (not uv)
+      # WHY: uv tried to create venv in /home/app which doesn't exist
+      #      in GitHub Actions runner. Standard pip works better here.
+      # ------------------------------------------------------
       - name: Set up Python
-        run: uv python install 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       
+      # ------------------------------------------------------
+      # CHANGE 6: Install Pulumi dependencies with pip
+      # WHY: uv sync failed with "Permission denied: '/home/app'"
+      #      because uv looks for project root incorrectly.
+      #      pip install directly is simpler and works.
+      # ------------------------------------------------------
       - name: Install deployment dependencies
-        working-directory: services/deployment
-        run: uv sync
+        run: |
+          pip install pulumi pulumi-gcp pulumi-docker-build pulumi-kubernetes
       
+      # ------------------------------------------------------
+      # CHANGE 7: Configure kubectl for GKE
+      # WHY: Pulumi needs kubectl configured to deploy K8s resources
+      # ------------------------------------------------------
       - name: Configure GKE credentials
         run: |
           gcloud container clusters get-credentials newsjuice-cluster \
             --zone=${{ env.GCP_ZONE }} \
             --project=${{ env.GCP_PROJECT }}
       
+      # ------------------------------------------------------
+      # CHANGE 8: Login to Pulumi backend (GCS bucket)
+      # WHY: Pulumi stores state in GCS, needs to authenticate
+      # ------------------------------------------------------
       - name: Pulumi Login to GCS
-        env:
-          PULUMI_BUCKET: gs://${{ env.GCP_PROJECT }}-pulumi-state-bucket
-        run: pulumi login $PULUMI_BUCKET
+        run: pulumi login gs://${{ env.GCP_PROJECT }}-pulumi-state-bucket
       
+      # ------------------------------------------------------
+      # CHANGE 9: Run Pulumi deployment
+      # WHY: This actually deploys the infrastructure
+      # 
+      # CHANGE 9a: Use 'dev' stack instead of 'prod'
+      # WHY: You've been using 'dev' stack locally, so state exists there.
+      #      Using 'prod' created a new empty stack causing issues.
+      #
+      # CHANGE 9b: Added PULUMI_CONFIG_PASSPHRASE=""
+      # WHY: Prevents Pulumi from asking for passphrase interactively
+      # ------------------------------------------------------
       - name: Pulumi Up
         working-directory: services/deployment
         env:
@@ -205,7 +248,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
         run: |
-          pulumi stack select prod --create
+          pulumi stack select dev --create
           pulumi up --yes --skip-preview
 
   # ============================================================
