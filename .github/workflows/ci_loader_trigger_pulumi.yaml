@@ -1,5 +1,6 @@
 name: CI - Loader Tests New Folders
 
+
 on:
   push:
     branches: [main, develop]
@@ -202,6 +203,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
         run: |
+          # Override Pulumi.yaml to use pip toolchain (no venv)
           cat > Pulumi.yaml << 'EOF'
           name: newsjuice-loader
           runtime:
@@ -210,6 +212,15 @@ jobs:
               toolchain: pip
           description: NewsJuice Loader Service with Cloud SQL PostgreSQL
           EOF
+          
+          # Create symlinks to match expected absolute paths in __main__.py
+          # Your __main__.py uses paths like "/loader_deployed"
+          # In GitHub Actions, code is at $GITHUB_WORKSPACE/services/...
+          # Symlinks make both environments work
+          sudo ln -sf $GITHUB_WORKSPACE/services/loader_deployed /loader_deployed
+          sudo ln -sf $GITHUB_WORKSPACE/services/scraper_deployed /scraper_deployed
+          sudo ln -sf $GITHUB_WORKSPACE/services/chatter_deployed /chatter_deployed
+          sudo ln -sf $GITHUB_WORKSPACE/services/frontend /frontend
           
           pulumi stack select dev --create
           pulumi up --yes --skip-preview
