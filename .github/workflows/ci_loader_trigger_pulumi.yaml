@@ -171,6 +171,11 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT }}
       
+      - name: Install GKE auth plugin
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+      
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
       
@@ -187,6 +192,8 @@ jobs:
           pip install pulumi pulumi-gcp pulumi-docker-build pulumi-kubernetes
       
       - name: Configure GKE credentials
+        env:
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
         run: |
           gcloud container clusters get-credentials newsjuice-cluster \
             --zone=${{ env.GCP_ZONE }} \
@@ -199,6 +206,8 @@ jobs:
         working-directory: services/deployment
         env:
           PULUMI_CONFIG_PASSPHRASE: ""
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+          KUBECONFIG: /home/runner/.kube/config
           GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT }}
           GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
         run: |
@@ -217,9 +226,21 @@ jobs:
           sudo ln -sf $GITHUB_WORKSPACE/services/chatter_deployed /chatter_deployed
           sudo ln -sf $GITHUB_WORKSPACE/services/frontend/podcast-app /frontend
           
+          # Debug: verify symlinks
+          echo "Checking symlinks..."
+          ls -la /loader_deployed/Dockerfile
+          ls -la /scraper_deployed/Dockerfile
+          ls -la /chatter_deployed/Dockerfile
+          ls -la /frontend/Dockerfile
+          
+          # Debug: verify kubectl works
+          echo "Testing kubectl..."
+          kubectl get nodes || echo "kubectl failed but continuing..."
+          
+          # Run Pulumi
           pulumi stack select dev
           pulumi cancel --yes || true
-          pulumi refresh --yes || true
+          pulumi refresh --yes --skip-preview || true
           pulumi up --yes --skip-preview
 
   # ============================================================
@@ -243,3 +264,4 @@ jobs:
           echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| System Tests | ${{ needs.system-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          
