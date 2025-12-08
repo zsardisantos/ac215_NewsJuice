@@ -55,7 +55,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: services/loader_deployed
-        run: uv sync
+        run: uv sync --all-extras
       
       - name: Run unit tests
         working-directory: services/loader_deployed
@@ -103,7 +103,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: services/loader_deployed
-        run: uv sync
+        run: uv sync --all-extras
       
       - name: Run integration tests
         working-directory: services/loader_deployed
