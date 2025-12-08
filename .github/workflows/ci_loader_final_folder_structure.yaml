@@ -133,8 +133,7 @@ jobs:
       - name: Run system tests
         working-directory: services/loader_deployed
         run: |
-          docker compose -f docker-compose.test.yml run --rm test-runner \
-            pytest tests/system/ -v --tb=short
+          docker compose -f docker-compose.test.yml run --rm system-tests
       
       - name: Show logs on failure
         if: failure()
