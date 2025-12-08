@@ -211,12 +211,15 @@ jobs:
           description: NewsJuice Loader Service with Cloud SQL PostgreSQL
           EOF
           
+          # Create symlinks to match absolute paths in __main__.py
           sudo ln -sf $GITHUB_WORKSPACE/services/loader_deployed /loader_deployed
           sudo ln -sf $GITHUB_WORKSPACE/services/scraper_deployed /scraper_deployed
           sudo ln -sf $GITHUB_WORKSPACE/services/chatter_deployed /chatter_deployed
-          sudo ln -sf $GITHUB_WORKSPACE/services/frontend /frontend
+          sudo ln -sf $GITHUB_WORKSPACE/services/frontend/podcast-app /frontend
           
           pulumi stack select dev
+          pulumi cancel --yes || true
+          pulumi refresh --yes || true
           pulumi up --yes --skip-preview
 
   # ============================================================
