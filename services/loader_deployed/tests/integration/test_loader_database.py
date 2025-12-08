@@ -8,7 +8,7 @@ import pandas as pd
 
 @pytest.fixture(autouse=True)
 def mock_env(monkeypatch, db_url):
-    """Set DATABASE_URL for loader_modular import"""
+    """Set DATABASE_URL for loader import"""
     monkeypatch.setenv("DATABASE_URL", db_url)
 
 
@@ -59,7 +59,7 @@ class TestDatabaseManagerIntegration:
     
     def test_fetch_unprocessed_articles(self, db_url, insert_test_article, clean_test_data):
         """Test DatabaseManager fetches articles with vflag=0"""
-        from loader_modular import DatabaseManager
+        from loader import DatabaseManager
         
         with DatabaseManager(db_url) as db:
             articles = db.fetch_unprocessed_articles()
@@ -70,7 +70,7 @@ class TestDatabaseManagerIntegration:
     
     def test_insert_chunks(self, db_url, vector_table, insert_test_article, clean_test_data):
         """Test DatabaseManager inserts chunks correctly"""
-        from loader_modular import DatabaseManager
+        from loader import DatabaseManager
         
         # Create test chunks DataFrame
         df = pd.DataFrame([
@@ -126,7 +126,7 @@ class TestDatabaseManagerIntegration:
     
     def test_mark_article_processed(self, db_url, articles_table, insert_test_article, clean_test_data):
         """Test DatabaseManager updates vflag to 1"""
-        from loader_modular import DatabaseManager
+        from loader import DatabaseManager
         
         # Verify vflag starts at 0
         conn = psycopg.connect(db_url)
@@ -163,7 +163,7 @@ class TestChunkingIntegration:
     
     def test_chunking_creates_valid_chunks(self, db_url):
         """Test chunking strategies work with real text"""
-        from loader_modular import RecursiveChunking
+        from loader import RecursiveChunking
         
         chunker = RecursiveChunking(chunk_size=100, chunk_overlap=20)
         text = "This is a test paragraph. " * 20

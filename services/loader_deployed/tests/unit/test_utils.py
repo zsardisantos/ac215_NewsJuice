@@ -14,7 +14,7 @@ def mock_db_url(monkeypatch):
 
 def test_character_chunking_creates_chunks():
     """Test that character chunking creates chunks"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking(chunk_size=50, chunk_overlap=10)
     text = "This is a test sentence. " * 10
@@ -28,7 +28,7 @@ def test_character_chunking_creates_chunks():
 
 def test_character_chunking_with_short_text():
     """Test character chunking with short text"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking(chunk_size=100, chunk_overlap=0)
     text = "Short text."
@@ -40,7 +40,7 @@ def test_character_chunking_with_short_text():
 
 def test_character_chunking_with_empty_text():
     """Test character chunking with empty string"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking()
     text = ""
@@ -52,7 +52,7 @@ def test_character_chunking_with_empty_text():
 
 def test_character_chunking_with_long_text():
     """Test that long text creates multiple chunks"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking(chunk_size=50, chunk_overlap=0)
     text = "This is a sentence.\n\n" * 50
@@ -67,7 +67,7 @@ def test_character_chunking_with_long_text():
 
 def test_recursive_chunking_creates_chunks():
     """Test recursive chunking"""
-    from loader_modular import RecursiveChunking
+    from loader import RecursiveChunking
 
     chunker = RecursiveChunking(chunk_size=100)
     text = "This is a test. " * 20
@@ -80,7 +80,7 @@ def test_recursive_chunking_creates_chunks():
 
 def test_recursive_chunking_respects_size():
     """Test that recursive chunks are reasonable size"""
-    from loader_modular import RecursiveChunking
+    from loader import RecursiveChunking
 
     chunk_size = 50
     chunker = RecursiveChunking(chunk_size=chunk_size)
@@ -97,7 +97,7 @@ def test_recursive_chunking_respects_size():
 
 def test_get_char_split_strategy():
     """Test factory returns CharacterChunking"""
-    from loader_modular import CharacterChunking, get_chunking_strategy
+    from loader import CharacterChunking, get_chunking_strategy
 
     strategy = get_chunking_strategy("char-split")
 
@@ -106,7 +106,7 @@ def test_get_char_split_strategy():
 
 def test_get_recursive_split_strategy():
     """Test factory returns RecursiveChunking"""
-    from loader_modular import RecursiveChunking, get_chunking_strategy
+    from loader import RecursiveChunking, get_chunking_strategy
 
     strategy = get_chunking_strategy("recursive-split")
 
@@ -115,7 +115,7 @@ def test_get_recursive_split_strategy():
 
 def test_get_unknown_strategy_raises_error():
     """Test factory raises error for unknown method"""
-    from loader_modular import get_chunking_strategy
+    from loader import get_chunking_strategy
 
     with pytest.raises(ValueError) as exc_info:
         get_chunking_strategy("unknown-method")
@@ -125,7 +125,7 @@ def test_get_unknown_strategy_raises_error():
 
 #def test_semantic_split_without_embeddings_raises_error():
 #    """Test semantic split needs embeddings"""
-#    from loader_modular import get_chunking_strategy
+#    from loader import get_chunking_strategy
 #
 #    with pytest.raises(ValueError) as exc_info:
 #        get_chunking_strategy("semantic-split", embeddings=None)
@@ -138,7 +138,7 @@ def test_get_unknown_strategy_raises_error():
 
 def test_chunking_with_none_text():
     """Test chunking handles None gracefully"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking()
 
@@ -149,7 +149,7 @@ def test_chunking_with_none_text():
 
 def test_chunking_with_special_characters():
     """Test chunking with special characters"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking(chunk_size=50)
     text = "Test with émojis 🎉 and spëcial çharacters!"
@@ -162,7 +162,7 @@ def test_chunking_with_special_characters():
 
 def test_default_chunk_size():
     """Test that default parameters work"""
-    from loader_modular import CharacterChunking
+    from loader import CharacterChunking
 
     chunker = CharacterChunking()  # Using defaults
     text = "Test " * 100
@@ -177,7 +177,7 @@ def test_default_chunk_size():
 
 def test_article_creation():
     """Test Article dataclass"""
-    from loader_modular import Article
+    from loader import Article
 
     article = Article(
         id=1,
@@ -199,7 +199,7 @@ def test_article_creation():
 
 def test_processing_result():
     """Test ProcessingResult dataclass"""
-    from loader_modular import ProcessingResult
+    from loader import ProcessingResult
 
     result = ProcessingResult(
         status="success",

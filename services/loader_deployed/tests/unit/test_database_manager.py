@@ -11,7 +11,7 @@ def mock_db_url(monkeypatch):
 
 
 def test_database_manager_fetch_insert_and_mark(monkeypatch):
-    import loader_modular as loader_mod
+    import loader as loader_mod
 
     # --- Fake psycopg connection & cursor ---------------------------------
     fake_rows = [

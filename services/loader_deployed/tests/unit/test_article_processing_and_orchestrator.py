@@ -11,7 +11,7 @@ def mock_db_url(monkeypatch):
 
 
 def test_create_chunks_dataframe_and_process_article():
-    from loader_modular import Article, ArticleProcessor, ChunkingStrategy
+    from loader import Article, ArticleProcessor, ChunkingStrategy
 
     # --- Dummy strategy & embedder to avoid external dependencies ----------
     class DummyChunking(ChunkingStrategy):
@@ -58,7 +58,7 @@ def test_create_chunks_dataframe_and_process_article():
 
 
 def test_chunk_embed_load_orchestrates(monkeypatch):
-    import loader_modular as loader_mod
+    import loader as loader_mod
 
     # --- Fake components to avoid real DB and Vertex -----------------------
     class FakeEmbedder:
