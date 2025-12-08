@@ -1,0 +1,168 @@
+name: CI - Loader Tests New Folders
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/loader_deployed/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/loader_deployed/**'
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # LINT
+  # ============================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install linters
+        run: pip install ruff black
+      
+      - name: Run Black
+        run: black --check services/loader_deployed/*.py || true
+      
+      - name: Run Ruff
+        run: ruff check services/loader_deployed/*.py --ignore E501 || true
+
+  # ============================================================
+  # UNIT TESTS
+  # ============================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      
+      - name: Set up Python
+        run: uv python install 3.12
+      
+      - name: Install dependencies
+        working-directory: services/loader_deployed
+        run: uv sync
+      
+      - name: Run unit tests
+        working-directory: services/loader_deployed
+        run: uv run pytest tests/unit/ -v --tb=short
+
+  # ============================================================
+  # INTEGRATION TESTS
+  # ============================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: newsdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      
+      - name: Set up Python
+        run: uv python install 3.12
+      
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+      
+      - name: Initialize test database
+        run: |
+          PGPASSWORD=testpassword psql -h localhost -U postgres -d newsdb_test \
+            -f services/loader_deployed/tests/setup/init_test_db.sql
+      
+      - name: Install dependencies
+        working-directory: services/loader_deployed
+        run: uv sync
+      
+      - name: Run integration tests
+        working-directory: services/loader_deployed
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/newsdb_test
+          ARTICLES_TABLE_NAME: articles_test
+          VECTOR_TABLE_NAME: chunks_vector_test
+        run: uv run pytest tests/integration/ -v --tb=short
+
+  # ============================================================
+  # SYSTEM TESTS
+  # ============================================================
+  system-tests:
+    name: System Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Start services
+        working-directory: services/loader_deployed
+        run: |
+          docker compose -f docker-compose.test.yml up -d --build
+          sleep 30
+      
+      - name: Run system tests
+        working-directory: services/loader_deployed
+        run: |
+          docker compose -f docker-compose.test.yml run --rm test-runner \
+            pytest tests/system/ -v --tb=short
+      
+      - name: Show logs on failure
+        if: failure()
+        working-directory: services/loader_deployed
+        run: docker compose -f docker-compose.test.yml logs
+      
+      - name: Cleanup
+        if: always()
+        working-directory: services/loader_deployed
+        run: docker compose -f docker-compose.test.yml down -v
+
+  # ============================================================
+  # SUMMARY
+  # ============================================================
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, integration-tests, system-tests]
+    if: always()
+    
+    steps:
+      - name: Summary
+        run: |
+          echo "## Loader CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| System Tests | ${{ needs.system-tests.result }} |" >> $GITHUB_STEP_SUMMARY

@@ -39,8 +39,8 @@ from google.genai import errors
 from google.genai import types
 
 # Langchain
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 #from langchain_experimental.text_splitter import SemanticChunker
 
 # source: https://api.python.langchain.com/en/latest/text_splitter/langchain_experimental.text_splitter.SemanticChunker.html

@@ -1,4 +1,4 @@
-yamlservices:
+services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
@@ -38,8 +38,6 @@ yamlservices:
     environment:
       DATABASE_URL: postgresql://fake
     command: uv run pytest tests/unit/ -v
-    volumes:
-      - .:/app
 
   integration-tests:
     build:
@@ -53,8 +51,6 @@ yamlservices:
       postgres:
         condition: service_healthy
     command: uv run pytest tests/integration/ -v
-    volumes:
-      - .:/app
 
   system-tests:
     build:
@@ -71,7 +67,4 @@ yamlservices:
       postgres:
         condition: service_healthy
     command: uv run pytest tests/system/ -v
-    volumes:
-      - .:/app
-
-      
+    

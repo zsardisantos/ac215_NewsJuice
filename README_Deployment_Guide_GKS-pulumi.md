@@ -3,6 +3,9 @@
 Please find a detailed Deployment Architecture diagam below.
 
 The NewsJuice app is now fully deployed via pulumi and on GKE (kubernetes) and up and running.
+This describes the deployment via deployment container (run sg docker-shell.sh)
+
+The separate **README_Deployment_Guide_CI-CD.md** describes automation via GitHub Actions and a CI/CD workflow.
 
 Final URLs:
 
@@ -855,3 +858,6 @@ Terminal 2.
 k9s -n newsjuice
 Terminal 3.
 hey -z 60s -c 50 https://www.newsjuiceapp.com/api/health
+
+# Watch continuously
+watch -n 2 kubectl top pods -n newsjuice

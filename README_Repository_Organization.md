@@ -1,4 +1,86 @@
-# Explanation of the main files in the repository.
+# Structure of the repository
+
+
+```
+services/
+├── loader_deployed/
+│   ├── loader.py
+│   ├── loader_modular.py
+│   ├── main.py
+│   ├── Dockerfile
+│   ├── pyproject.toml
+│   ├── docker-compose.test.yml
+│   └── tests/
+│       ├── __init__.py
+│       ├── conftest.py
+│       ├── setup/
+│       │   └── init_test_db.sql
+│       ├── unit/
+│       │   ├── __init__.py
+│       │   └── test_chunking.py
+│       ├── integration/
+│       │   ├── __init__.py
+│       │   └── test_database.py
+│       └── system/
+│           ├── __init__.py
+│           └── test_loader_api.py
+│
+├── scraper_deployed/
+│   ├── scraper.py
+│   ├── main.py
+│   ├── Dockerfile
+│   ├── pyproject.toml
+│   ├── docker-compose.test.yml
+│   └── tests/
+│       ├── __init__.py
+│       ├── conftest.py
+│       ├── setup/
+│       │   └── init_test_db.sql
+│       ├── unit/
+│       │   ├── __init__.py
+│       │   └── test_scraping.py
+│       ├── integration/
+│       │   ├── __init__.py
+│       │   └── test_database.py
+│       └── system/
+│           ├── __init__.py
+│           └── test_scraper_api.py
+│
+├── chatter_deployed/
+│   ├── chatter.py
+│   ├── main.py
+│   ├── Dockerfile
+│   ├── pyproject.toml
+│   ├── docker-compose.test.yml
+│   └── tests/
+│       ├── __init__.py
+│       ├── conftest.py
+│       ├── unit/
+│       │   ├── __init__.py
+│       │   └── test_chat.py
+│       ├── integration/
+│       │   ├── __init__.py
+│       │   └── test_database.py
+│       └── system/
+│           ├── __init__.py
+│           └── test_chatter_api.py
+│
+├── frontend/
+│   └── podcast-app/
+│       ├── src/
+│       ├── package.json
+│       ├── Dockerfile
+│       └── ... (React app files)
+│
+└── deployment/
+    ├── __main__.py
+    ├── Pulumi.yaml
+    ├── Pulumi.prod.yaml
+    ├── Dockerfile
+    ├── docker-shell.sh
+    └── docker-entrypoint.sh
+```
+
 
 **.github/**
 Contains the workflow file for the CI/CD GitHub Actions workflow (ci_full.yaml)

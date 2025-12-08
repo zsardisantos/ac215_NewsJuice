@@ -1,6 +1,49 @@
 # CI/CD set up and workflow
 
-Approach of CI/CD for deployment/production. 
+This document is complementary to **README_Deployment_Guide_GKS-pulumi.md**, and   
+describes an automated deployment via GitHub Actions.
+
+Prerequisites:
+
+OK: service account with right roles  
+```bash
+christianmichel@Christians-Laptop ac215_NewsJuice % gcloud projects get-iam-policy newsjuice-123456 \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:deployment@newsjuice-123456.iam.gserviceaccount.com" \
+  --format="table(bindings.role)"
+ROLE
+roles/artifactregistry.admin
+roles/compute.admin
+roles/compute.osLogin
+roles/container.admin
+roles/editor
+roles/iam.serviceAccountAdmin
+roles/iam.serviceAccountUser
+roles/resourcemanager.projectIamAdmin
+roles/run.admin
+roles/storage.admin
+christianmichel@Christians-Laptop ac215_NewsJuice % 
+```
+
+GitHub secret
+Go to: https://github.com/zsardisantos/ac215_NewsJuice/settings/secrets/actions  
+Click "New repository secret"  
+Name: GCP_SA_KEY  
+Value: Copy entire contents of ../secrets/deployment.json  
+Click "Add secret"  
+
+No additional secrets needed.  
+Pulumi uses GCS backend (not Pulumi Cloud):  
+The GCP_SA_KEY secret already has storage.admin role, so it can read/write the Pulumi state bucket.  
+(If woudl use Pulumi Cloud, would need PULUMI_ACCESS_TOKEN)  
+
+CHECK
+root@32cc13d7288e:/app# echo $PULUMI_BUCKET
+gs://newsjuice-123456-pulumi-state-bucket
+root@32cc13d7288e:/app# 
+(GCP_SA_KEY can access pulumi state)
+
+### Approach of CI/CD for deployment/production. 
 Instead of manual execution of deployement container (pulumi, kubernetes) automate this with GitHub Actions.
 
 | Manual | CI/CD |
@@ -69,6 +112,23 @@ Files to create (FOR EACH SERVICE TO TEST - here only for LOADER as example)
 13. services/loader_testing/docker-compose.test.yml  
 14. services/loader_testing/Dockerfile.test  
 
+
+
+
+| File | Purpose |
+|------|---------|
+| `pyproject.toml` | Dependencies + pytest config |
+| `docker-compose.test.yml` | System tests stack |
+| `Dockerfile.test` | Test runner container |
+| `tests/__init__.py` | Package marker |
+| `tests/conftest.py` | Shared fixtures |
+| `tests/setup/init_test_db.sql` | DB schema |
+| `tests/unit/__init__.py` | Package marker |
+| `tests/unit/test_chunking.py` | Unit tests |
+| `tests/integration/__init__.py` | Package marker |
+| `tests/integration/test_database.py` | DB tests |
+| `tests/system/__init__.py` | Package marker |
+| `tests/system/test_loader_api.py` | API tests |
 
 ```
 

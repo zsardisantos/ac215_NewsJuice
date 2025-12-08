@@ -19,7 +19,7 @@ from google import genai
 from google.genai import types
 
 # Langchain
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     CharacterTextSplitter,
     RecursiveCharacterTextSplitter,
 )
@@ -222,7 +222,7 @@ class CharacterChunking(ChunkingStrategy):
         self.splitter = CharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            separator=None,
+            separator="\n\n",
             strip_whitespace=False,
         )
 

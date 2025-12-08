@@ -1,8 +1,8 @@
-secrets/
-.DS_Store
-.env
-.env.local
+.venv
+__pycache__
 *.pyc
-__pycache__/
-.git/
-.gitignore
+.pytest_cache
+.coverage
+htmlcov
+*.egg-info
+.git
