@@ -40,7 +40,7 @@ class TestLoaderSystem:
         Uses real or mocked AI depending on environment
         """
         test_article_id = "test_article_123"
-        
+
         # Mock AI if needed
         if self.use_mocked_ai:
             with patch('api.loader.VertexEmbeddings') as mock_embeddings:

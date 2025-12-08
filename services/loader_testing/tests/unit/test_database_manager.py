@@ -21,7 +21,7 @@ def test_database_manager_fetch_insert_and_mark(monkeypatch):
             "Title",              # title
             "Summary",            # summary
             "Content",            # content
-            "http://example.com", # source_link
+            "http://example.com",   # source_link
             "rss",                # source_type
             "fetched",            # fetched_at
             "published",          # published_at
