@@ -1,6 +1,7 @@
 """
 Integration Tests for Article Loader API
 """
+
 import os
 import sys
 from unittest.mock import patch
@@ -50,7 +51,7 @@ class TestBasicFunctionality:
             "status": "success",
             "message": "Processed 3 articles",
             "processed": 3,
-            "total_found": 3
+            "total_found": 3,
         }
 
         response = client.post("/process-sync")

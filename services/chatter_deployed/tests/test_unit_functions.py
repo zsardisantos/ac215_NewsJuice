@@ -111,7 +111,6 @@ def test_classify_question_context_error():
 @patch("user_db.get_audio_history")
 def test_get_daily_brief_context(mock_get_history):
     """Test get_daily_brief_context logic"""
-    # We need full iso format for the parser
     now = datetime.now(timezone.utc).isoformat()
 
     mock_entry = {
@@ -131,15 +130,8 @@ def test_get_daily_brief_context(mock_get_history):
 
 
 def test_call_retriever_service_import_mock():
-    # Since call_retriever_service does a local import and sys.path modification,
-    # fully testing it requires mocking sys and the import.
-    # Simpler: Just mock sys.path to avoid error and mock the import if possible.
-    # But patching inner imports is hard without sys.modules hack.
-    # Instead, let's verify error handling (easy path).
     from helpers import call_retriever_service
 
-    # It will fail to import 'retriever' usually if path is wrong, triggering exception block
-    # This covers the exception handling path at least.
     result = call_retriever_service("query")
     assert result == []
 

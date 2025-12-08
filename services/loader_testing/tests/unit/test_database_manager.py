@@ -16,17 +16,17 @@ def test_database_manager_fetch_insert_and_mark(monkeypatch):
     # --- Fake psycopg connection & cursor ---------------------------------
     fake_rows = [
         (
-            1,                    # id
-            "Author",             # author
-            "Title",              # title
-            "Summary",            # summary
-            "Content",            # content
-            "http://example.com",   # source_link
-            "rss",                # source_type
-            "fetched",            # fetched_at
-            "published",          # published_at
-            0,                    # vflag
-            "article-1",          # article_id
+            1,  # id
+            "Author",  # author
+            "Title",  # title
+            "Summary",  # summary
+            "Content",  # content
+            "http://example.com",  # source_link
+            "rss",  # source_type
+            "fetched",  # fetched_at
+            "published",  # published_at
+            0,  # vflag
+            "article-1",  # article_id
         )
     ]
 
