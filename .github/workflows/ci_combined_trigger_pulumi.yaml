@@ -177,6 +177,63 @@ jobs:
             services/scraper_deployed/htmlcov/
 
   # ============================================================
+  # SCRAPER - INTEGRATION TESTS
+  # ============================================================
+  integration-tests-scraper:
+    name: Integration Tests Scraper
+    runs-on: ubuntu-latest
+    needs: lint-scraper
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - run: sudo apt-get install -y postgresql-client
+      - name: Init DB and run tests
+        working-directory: services/scraper_deployed
+        env:
+          DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
+        run: |
+          PGPASSWORD=test_pass psql -h localhost -U test_user -d test_db -f tests/setup/init_test_db.sql
+          uv sync --all-extras
+          uv run pytest tests/integration/ -v --tb=short
+
+  # ============================================================
+  # SCRAPER - SYSTEM TESTS
+  # ============================================================
+  system-tests-scraper:
+    name: System Tests Scraper
+    runs-on: ubuntu-latest
+    needs: [unit-tests-scraper, integration-tests-scraper]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run system tests
+        working-directory: services/scraper_deployed
+        run: |
+          docker compose -f docker-compose.test.yml up -d --build
+          sleep 30
+          docker compose -f docker-compose.test.yml run --rm system-tests
+      - if: failure()
+        working-directory: services/scraper_deployed
+        run: docker compose -f docker-compose.test.yml logs
+      - if: always()
+        working-directory: services/scraper_deployed
+        run: docker compose -f docker-compose.test.yml down -v
+
+  # ============================================================
   # CHATTER - LINT
   # ============================================================
   lint-chatter:
@@ -224,6 +281,63 @@ jobs:
             services/chatter_deployed/.coverage
             services/chatter_deployed/coverage.xml
             services/chatter_deployed/htmlcov/
+
+  # ============================================================
+  # CHATTER - INTEGRATION TESTS
+  # ============================================================
+  integration-tests-chatter:
+    name: Integration Tests Chatter
+    runs-on: ubuntu-latest
+    needs: lint-chatter
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - run: sudo apt-get install -y postgresql-client
+      - name: Init DB and run tests
+        working-directory: services/chatter_deployed
+        env:
+          DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
+        run: |
+          PGPASSWORD=test_pass psql -h localhost -U test_user -d test_db -f tests/setup/init_test_db.sql
+          uv sync --all-extras
+          uv run pytest tests/integration/ -v --tb=short
+
+  # ============================================================
+  # CHATTER - SYSTEM TESTS
+  # ============================================================
+  system-tests-chatter:
+    name: System Tests Chatter
+    runs-on: ubuntu-latest
+    needs: [unit-tests-chatter, integration-tests-chatter]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run system tests
+        working-directory: services/chatter_deployed
+        run: |
+          docker compose -f docker-compose.test.yml up -d --build
+          sleep 30
+          docker compose -f docker-compose.test.yml run --rm system-tests
+      - if: failure()
+        working-directory: services/chatter_deployed
+        run: docker compose -f docker-compose.test.yml logs
+      - if: always()
+        working-directory: services/chatter_deployed
+        run: docker compose -f docker-compose.test.yml down -v
 
   # ============================================================
   # COMBINED COVERAGE REPORT
@@ -517,7 +631,7 @@ jobs:
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
-    needs: [system-tests-loader, unit-tests-scraper, unit-tests-chatter]
+    needs: [system-tests-loader, system-tests-scraper, system-tests-chatter]
     
     steps:
       - uses: actions/checkout@v4
@@ -592,7 +706,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [lint-loader, unit-tests-loader, integration-tests-loader, system-tests-loader, lint-scraper, unit-tests-scraper, lint-chatter, unit-tests-chatter, coverage-report, deploy]
+    needs: [lint-loader, unit-tests-loader, integration-tests-loader, system-tests-loader, lint-scraper, unit-tests-scraper, integration-tests-scraper, system-tests-scraper, lint-chatter, unit-tests-chatter, integration-tests-chatter, system-tests-chatter, coverage-report, deploy]
     if: always()
     steps:
       - name: Summary
@@ -612,12 +726,16 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Lint | ${{ needs.lint-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit | ${{ needs.unit-tests-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration | ${{ needs.integration-tests-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| System | ${{ needs.system-tests-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Chatter" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Lint | ${{ needs.lint-chatter.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit | ${{ needs.unit-tests-chatter.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration | ${{ needs.integration-tests-chatter.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| System | ${{ needs.system-tests-chatter.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Coverage & Deploy" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY

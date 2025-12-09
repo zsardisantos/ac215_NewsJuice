@@ -260,3 +260,213 @@ def test_generate_daily_brief_success(
     assert data["success"] is True
     assert data["audio_url"] == "https://gcs/audio.mp3"
     assert data["podcast_text"] == "Good morning Harvard."
+
+
+@patch("main.verify_token")
+@patch("main.get_user_preferences")
+@patch("main.get_preferences_last_updated")
+@patch("main.get_voice_preference_last_updated")
+@patch("main.get_audio_history")
+def test_generate_daily_brief_voice_only_change(
+    mock_get_history,
+    mock_voice_updated,
+    mock_prefs_updated,
+    mock_get_prefs,
+    mock_verify_token,
+):
+    """Generate Daily Brief - Voice Only Change regeneration"""
+    mock_verify_token.return_value = {"uid": "test_uid"}
+
+    # Setup prefs: Voice updated AFTER content
+    mock_get_prefs.return_value = {"topics": '["Harvard"]', "voice_preference": "Echo"}
+    mock_prefs_updated.return_value = "2024-01-01T10:00:00Z"
+    mock_voice_updated.return_value = "2024-01-01T12:00:00Z"  # Voice updated later
+
+    # Setup history: Recent brief exists, created BEFORE voice update
+    mock_brief_entry = {
+        "question_text": "Daily Brief",
+        "podcast_text": "Existing transcript.",
+        "created_at": "2024-01-01T11:00:00Z",  # Created between content and voice update, but before voice update?
+        # WAIT. Main.py logic: if brief_created >= voice_updated, then it's ALREADY regenerated.
+        # We want regeneration -> Brief created BEFORE voice update.
+        # Voice updated 12:00. Brief created 11:00. 11:00 < 12:00.
+        # So it SHOULD regenerate.
+    }
+    mock_get_history.return_value = [mock_brief_entry]
+
+    # We need to mock TTS and Upload since it will proceed to regeneration from text
+    with (
+        patch("main.text_to_audio_bytes") as mock_tts,
+        patch("main.upload_audio_to_gcs") as mock_upload,
+        patch("main.save_audio_history") as mock_save_history,
+    ):
+
+        mock_tts.return_value = b"new_voice_audio"
+        mock_upload.return_value = "https://gcs/new_audio.mp3"
+        mock_save_history.return_value = True
+
+        headers = {"Authorization": "Bearer valid_token"}
+        response = client.post("/api/daily-brief", headers=headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["audio_url"] == "https://gcs/new_audio.mp3"
+        # Must verify it used existing text, NOT new generation
+        assert data["podcast_text"] == "Existing transcript."
+        # Verify TTS called with new voice
+        mock_tts.assert_called_with("Existing transcript.", voice_name="Echo")
+
+
+def test_websocket_raw_bytes_handling():
+    """WebSocket - Sending raw audio bytes"""
+    with client.websocket_connect("/ws/chat") as websocket:
+        # Send raw bytes (simulating audio chunk)
+        websocket.send_bytes(b"raw_audio_chunk")
+
+        # Expect chunk confirmation
+        response = websocket.receive_json()
+        assert response.get("status") == "chunk_received"
+        assert response.get("size") > 0
+
+
+def test_websocket_transcription_empty():
+    """WebSocket - Transcription returns empty string"""
+    import base64
+
+    dummy_audio = base64.b64encode(b"fake_audio").decode("utf-8")
+
+    with client.websocket_connect("/ws/chat") as websocket:
+        websocket.send_json({"type": "audio", "data": dummy_audio})
+
+        with patch("main.audio_to_text", new_callable=AsyncMock) as mock_stt:
+            mock_stt.return_value = ""  # Empty response
+
+            websocket.send_json({"type": "complete"})
+
+            # Expect transcribing status then error
+            response_1 = websocket.receive_json()
+            if response_1.get("status") == "transcribing":
+                response_2 = websocket.receive_json()
+                assert "error" in response_2
+            else:
+                assert "error" in response_1
+
+
+@patch("main.verify_token")
+@patch("helpers.get_daily_brief_context")
+@patch("helpers.classify_question_context")
+@patch("main.enhance_query_with_gemini")
+@patch("main._retrieve_and_generate_podcast", new_callable=AsyncMock)
+def test_websocket_contextual_flow(
+    mock_rag,
+    mock_enhance,
+    mock_classify,
+    mock_get_brief,
+    mock_verify_token,
+):
+    """WebSocket - Test contextual question flow (uses brief context)"""
+    mock_verify_token.return_value = {"uid": "test_uid"}
+
+    # Mock finding a daily brief
+    mock_get_brief.return_value = {"transcript": "Brief text", "chunks": []}
+
+    # Mock classification as CONTEXTUAL
+    mock_classify.return_value = "CONTEXTUAL"
+
+    # Mock enhance to ensure it's not called (though assert checks this too)
+    mock_enhance.return_value = ({}, None)
+
+    # Mock rag to send completion signal so test loop doesn't hang
+    async def fake_rag(websocket, *args, **kwargs):
+        await websocket.send_json({"status": "complete"})
+        return True
+
+    mock_rag.side_effect = fake_rag
+
+    with client.websocket_connect("/ws/chat?token=valid_token") as websocket:
+        # Send audio (simulated via JSON)
+        import base64
+
+        dummy_audio = base64.b64encode(b"fake_audio").decode("utf-8")
+        websocket.send_json({"type": "audio", "data": dummy_audio})
+
+        with patch("main.audio_to_text", new_callable=AsyncMock) as mock_stt:
+            mock_stt.return_value = "What about that?"
+
+            websocket.send_json({"type": "complete"})
+
+            # Consume all messages until complete or timeout
+            for _ in range(15):
+                try:
+                    msg = websocket.receive_json(mode="text")
+                    if "error" in msg or msg.get("status") == "complete":
+                        break
+                except Exception:
+                    break
+
+            # Verify classify was called
+            mock_classify.assert_called_once()
+            # Verify RAG called with use_brief_context=True
+            mock_rag.assert_called_once()
+            _, kwargs = mock_rag.call_args
+            assert kwargs.get("use_brief_context") is True
+            # Verify enhancement was NOT called (logic skips it for contextual)
+            mock_enhance.assert_not_called()
+
+
+@patch("main.verify_token")
+@patch("helpers.get_daily_brief_context")
+@patch("helpers.classify_question_context")
+@patch("main.enhance_query_with_gemini")
+@patch("main._retrieve_and_generate_podcast", new_callable=AsyncMock)
+def test_websocket_general_flow_with_brief_exist(
+    mock_rag,
+    mock_enhance,
+    mock_classify,
+    mock_get_brief,
+    mock_verify_token,
+):
+    """WebSocket - Test GENERAL question flow even when brief exists"""
+    mock_verify_token.return_value = {"uid": "test_uid"}
+    mock_get_brief.return_value = {"transcript": "Brief text", "chunks": []}
+
+    # Mock classification as GENERAL
+    mock_classify.return_value = "GENERAL"
+
+    # Mock enhance
+    mock_enhance.return_value = ({"enhanced_query_1": "Enhanced"}, None)
+
+    # Mock rag to send completion signal
+    async def fake_rag(websocket, *args, **kwargs):
+        await websocket.send_json({"status": "complete"})
+        return True
+
+    mock_rag.side_effect = fake_rag
+
+    with client.websocket_connect("/ws/chat?token=valid_token") as websocket:
+        import base64
+
+        dummy_audio = base64.b64encode(b"fake_audio").decode("utf-8")
+        websocket.send_json({"type": "audio", "data": dummy_audio})
+
+        with patch("main.audio_to_text", new_callable=AsyncMock) as mock_stt:
+            mock_stt.return_value = "What is the weather?"
+
+            websocket.send_json({"type": "complete"})
+
+            for _ in range(15):
+                try:
+                    msg = websocket.receive_json(mode="text")
+                    if "error" in msg or msg.get("status") == "complete":
+                        break
+                except Exception:
+                    break
+
+            # Verify classify was called
+            mock_classify.assert_called_once()
+            # Verify enhancement WAS called (since it's GENERAL)
+            mock_enhance.assert_called_once()
+            # Verify RAG called with use_brief_context=False
+            _, kwargs = mock_rag.call_args
+            assert kwargs.get("use_brief_context") is False
