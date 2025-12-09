@@ -1,5 +1,6 @@
 name: CI/CD - NewsJuice Services
 
+
 on:
   push:
     branches: [main, develop]
@@ -35,7 +36,7 @@ jobs:
       - run: flake8 services/loader_deployed/*.py --max-line-length=120 || true
 
   # ============================================================
-  # LOADER - UNIT TESTS
+  # LOADER - UNIT TESTS (with coverage)
   # ============================================================
   unit-tests-loader:
     name: Unit Tests Loader
@@ -133,7 +134,7 @@ jobs:
       - run: flake8 services/scraper_deployed/*.py --max-line-length=120 || true
 
   # ============================================================
-  # SCRAPER - UNIT TESTS
+  # SCRAPER - UNIT TESTS (with coverage)
   # ============================================================
   unit-tests-scraper:
     name: Unit Tests Scraper
@@ -157,7 +158,7 @@ jobs:
             services/scraper_deployed/htmlcov/
 
   # ============================================================
-  # COMBINED COVERAGE REPORT
+  # COMBINED COVERAGE REPORT (NEW)
   # ============================================================
   coverage-report:
     name: Coverage Report
@@ -207,70 +208,79 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   # ============================================================
-  # DEPLOY - Using deployment container
+  # DEPLOY (ORIGINAL WORKING VERSION)
   # ============================================================
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
     needs: [system-tests-loader, unit-tests-scraper]
+    
     steps:
       - uses: actions/checkout@v4
       
-      - name: Write GCP credentials
-        run: echo '${{ secrets.GCP_SA_KEY }}' > ${{ github.workspace }}/gcp-key.json
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
       
-      - name: Build deployment container
-        working-directory: services/deployment
-        run: docker build -t deployer .
+      - name: Set up Cloud SDK with GKE plugin
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+          install_components: 'gke-gcloud-auth-plugin'
       
-      - name: Deploy
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+      
+      - name: Install Pulumi
+        uses: pulumi/actions@v5
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install deployment dependencies
+        run: pip install pulumi pulumi-gcp pulumi-docker-build pulumi-kubernetes
+      
+      - name: Configure GKE credentials
+        env:
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
         run: |
-          docker run --rm \
-            --entrypoint /bin/bash \
-            -v ${{ github.workspace }}:/workspace \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -w /app \
-            deployer -c "
-              set -e
-              
-              # Authenticate
-              gcloud auth activate-service-account --key-file=/workspace/gcp-key.json
-              gcloud config set project ${{ env.GCP_PROJECT }}
-              gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-              
-              # Configure kubectl
-              gcloud container clusters get-credentials newsjuice-cluster \
-                --zone=${{ env.GCP_ZONE }} \
-                --project=${{ env.GCP_PROJECT }}
-              
-              # Create symlinks for Pulumi
-              ln -sf /workspace/services/loader_deployed /loader_deployed
-              ln -sf /workspace/services/scraper_deployed /scraper_deployed
-              ln -sf /workspace/services/chatter_deployed /chatter_deployed
-              ln -sf /workspace/services/frontend/podcast-app /frontend
-              
-              # Override Pulumi.yaml to use pip (no venv)
-              cat > /workspace/services/deployment/Pulumi.yaml << 'EOFPULUMI'
+          gcloud container clusters get-credentials newsjuice-cluster \
+            --zone=${{ env.GCP_ZONE }} \
+            --project=${{ env.GCP_PROJECT }}
+      
+      - name: Pulumi Login to GCS
+        run: pulumi login gs://${{ env.GCP_PROJECT }}-pulumi-state-bucket
+      
+      - name: Pulumi Up
+        working-directory: services/deployment
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ""
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
+          KUBECONFIG: /home/runner/.kube/config
+          GOOGLE_CLOUD_PROJECT: ${{ env.GCP_PROJECT }}
+          GOOGLE_CLOUD_REGION: ${{ env.GCP_REGION }}
+        run: |
+          cat > Pulumi.yaml << 'EOF'
           name: newsjuice-loader
           runtime:
             name: python
             options:
               toolchain: pip
           description: NewsJuice Loader Service with Cloud SQL PostgreSQL
-          EOFPULUMI
-              
-              # Run Pulumi
-              cd /workspace/services/deployment
-              pulumi login gs://${{ env.GCP_PROJECT }}-pulumi-state-bucket
-              pulumi stack select dev
-              pulumi cancel --yes || true
-              pulumi refresh --yes --skip-preview || true
-              pulumi up --yes --skip-preview
-            "
-      
-      - name: Cleanup credentials
-        if: always()
-        run: rm -f ${{ github.workspace }}/gcp-key.json
+          EOF
+          
+          sudo ln -sf $GITHUB_WORKSPACE/services/loader_deployed /loader_deployed
+          sudo ln -sf $GITHUB_WORKSPACE/services/scraper_deployed /scraper_deployed
+          sudo ln -sf $GITHUB_WORKSPACE/services/chatter_deployed /chatter_deployed
+          sudo ln -sf $GITHUB_WORKSPACE/services/frontend/podcast-app /frontend
+          
+          pulumi stack select dev
+          pulumi cancel --yes || true
+          pulumi refresh --yes --skip-preview || true
+          pulumi up --yes --skip-preview
 
   # ============================================================
   # SUMMARY
@@ -304,4 +314,3 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Coverage | ${{ needs.coverage-report.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
-          
