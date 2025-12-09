@@ -212,6 +212,7 @@ jobs:
           EOF
           uv run pytest tests/unit/ -v --tb=short \
             --cov=. \
+            --cov-fail-under=10 \
             --cov-report=term \
             --cov-report=xml:coverage.xml \
             --cov-report=html
