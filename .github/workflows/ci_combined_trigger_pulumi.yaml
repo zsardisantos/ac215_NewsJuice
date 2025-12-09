@@ -439,6 +439,8 @@ jobs:
             cat > .coveragerc << 'EOF'
           [run]
           omit = tests/*, test/*, conftest.py
+          [report]
+          fail_under = 10
           EOF
             coverage report >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
             cd "$GITHUB_WORKSPACE"
@@ -621,4 +623,3 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Coverage | ${{ needs.coverage-report.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
-          
