@@ -9,9 +9,7 @@ Uses Vertex AI for embeddings of the chunks
 **Chunking option available**
 - `char-split` character splitting
 - `recursive-split` recursive splitting (**CHOSEN**)
-- `semantic-split` (using embedding model below)
-
-
+- `semantic-split` (using embedding model below
 
 Database Information
 - **Account:** `harvardnewsjuice@gmail.com`  

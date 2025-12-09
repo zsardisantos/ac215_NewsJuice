@@ -1,5 +1,4 @@
 name: CI/CD - NewsJuice Services
-
 on:
   push:
     branches: [main, develop]
@@ -49,9 +48,12 @@ jobs:
         working-directory: services/loader_deployed
         run: |
           uv sync --all-extras
+          cat > .coveragerc << 'EOF'
+          [run]
+          omit = tests/*, test/*, conftest.py
+          EOF
           uv run pytest tests/unit/ -v --tb=short \
             --cov=. \
-            --cov-omit="tests/*,test/*,conftest.py" \
             --cov-report=term \
             --cov-report=xml:coverage.xml \
             --cov-report=html
@@ -153,9 +155,12 @@ jobs:
         working-directory: services/scraper_deployed
         run: |
           uv sync --all-extras
+          cat > .coveragerc << 'EOF'
+          [run]
+          omit = tests/*, test/*, conftest.py
+          EOF
           uv run pytest tests/unit/ -v --tb=short \
             --cov=. \
-            --cov-omit="tests/*,test/*,conftest.py" \
             --cov-report=term \
             --cov-report=xml:coverage.xml \
             --cov-report=html
@@ -304,7 +309,11 @@ jobs:
           LOADER_COV=$(find coverage-loader -name ".coverage" | head -1)
           if [ -n "$LOADER_COV" ] && [ -f "$LOADER_COV" ]; then
             cd $(dirname "$LOADER_COV")
-            coverage report --omit="tests/*,test/*,conftest.py" >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
+            cat > .coveragerc << 'EOF'
+          [run]
+          omit = tests/*, test/*, conftest.py
+          EOF
+            coverage report >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
             cd "$GITHUB_WORKSPACE"
           else
             echo "No .coverage file found" >> coverage-summary.txt
@@ -317,7 +326,11 @@ jobs:
           SCRAPER_COV=$(find coverage-scraper -name ".coverage" | head -1)
           if [ -n "$SCRAPER_COV" ] && [ -f "$SCRAPER_COV" ]; then
             cd $(dirname "$SCRAPER_COV")
-            coverage report --omit="tests/*,test/*,conftest.py" >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
+            cat > .coveragerc << 'EOF'
+          [run]
+          omit = tests/*, test/*, conftest.py
+          EOF
+            coverage report >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
             cd "$GITHUB_WORKSPACE"
           else
             echo "No .coverage file found" >> coverage-summary.txt
