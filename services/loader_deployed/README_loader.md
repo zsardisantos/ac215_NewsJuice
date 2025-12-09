@@ -13,8 +13,6 @@ Uses Vertex AI for embeddings of the chunks
 
 
 
-
-
 Database Information
 - **Account:** `harvardnewsjuice@gmail.com`  
 - **Project:** `NewsJuice`  
