@@ -1,15 +1,18 @@
 name: CI/CD - NewsJuice Services
+
 on:
   push:
     branches: [main, develop]
     paths:
       - 'services/loader_deployed/**'
       - 'services/scraper_deployed/**'
+      - 'services/chatter_deployed/**'
   pull_request:
     branches: [main, develop]
     paths:
       - 'services/loader_deployed/**'
       - 'services/scraper_deployed/**'
+      - 'services/chatter_deployed/**'
   workflow_dispatch:
 
 env:
@@ -174,12 +177,60 @@ jobs:
             services/scraper_deployed/htmlcov/
 
   # ============================================================
+  # CHATTER - LINT
+  # ============================================================
+  lint-chatter:
+    name: Lint Chatter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install flake8 black
+      - run: black --check services/chatter_deployed/*.py || true
+      - run: flake8 services/chatter_deployed/*.py --max-line-length=120 || true
+
+  # ============================================================
+  # CHATTER - UNIT TESTS
+  # ============================================================
+  unit-tests-chatter:
+    name: Unit Tests Chatter
+    runs-on: ubuntu-latest
+    needs: lint-chatter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - name: Run tests with coverage
+        working-directory: services/chatter_deployed
+        run: |
+          uv sync --all-extras
+          cat > .coveragerc << 'EOF'
+          [run]
+          omit = tests/*, test/*, conftest.py
+          EOF
+          uv run pytest tests/unit/ -v --tb=short \
+            --cov=. \
+            --cov-report=term \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-chatter-unit
+          path: |
+            services/chatter_deployed/.coverage
+            services/chatter_deployed/coverage.xml
+            services/chatter_deployed/htmlcov/
+
+  # ============================================================
   # COMBINED COVERAGE REPORT
   # ============================================================
   coverage-report:
     name: Coverage Report
     runs-on: ubuntu-latest
-    needs: [unit-tests-loader, unit-tests-scraper]
+    needs: [unit-tests-loader, unit-tests-scraper, unit-tests-chatter]
     steps:
       - uses: actions/checkout@v4
       
@@ -194,6 +245,12 @@ jobs:
         with:
           name: coverage-scraper-unit
           path: coverage-scraper
+      
+      - name: Download chatter coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-chatter-unit
+          path: coverage-chatter
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -210,10 +267,12 @@ jobs:
           # Find coverage XML files
           LOADER_XML=$(find coverage-loader -name "coverage.xml" | head -1)
           SCRAPER_XML=$(find coverage-scraper -name "coverage.xml" | head -1)
+          CHATTER_XML=$(find coverage-chatter -name "coverage.xml" | head -1)
           
           # Find htmlcov directories
           LOADER_HTML=$(find coverage-loader -type d -name "htmlcov" | head -1)
           SCRAPER_HTML=$(find coverage-scraper -type d -name "htmlcov" | head -1)
+          CHATTER_HTML=$(find coverage-chatter -type d -name "htmlcov" | head -1)
           
           echo "## Coverage Report" > coverage-summary.txt
           echo "" >> coverage-summary.txt
@@ -221,10 +280,13 @@ jobs:
           # Parse individual coverage from XML files
           LOADER_PCT="N/A"
           SCRAPER_PCT="N/A"
+          CHATTER_PCT="N/A"
           LOADER_STMTS=0
           LOADER_MISS=0
           SCRAPER_STMTS=0
           SCRAPER_MISS=0
+          CHATTER_STMTS=0
+          CHATTER_MISS=0
           
           if [ -n "$LOADER_XML" ] && [ -f "$LOADER_XML" ]; then
             LOADER_PCT=$(python3 -c "
@@ -286,9 +348,39 @@ jobs:
           " 2>/dev/null || echo "0")
           fi
           
+          if [ -n "$CHATTER_XML" ] && [ -f "$CHATTER_XML" ]; then
+            CHATTER_PCT=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('$CHATTER_XML')
+          root = tree.getroot()
+          print(f\"{float(root.get('line-rate', 0)) * 100:.1f}%\")
+          ")
+            CHATTER_STMTS=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('$CHATTER_XML')
+          root = tree.getroot()
+          stmts = 0
+          for cls in root.findall('.//class'):
+              for line in cls.findall('.//line'):
+                  stmts += 1
+          print(stmts)
+          " 2>/dev/null || echo "0")
+            CHATTER_MISS=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('$CHATTER_XML')
+          root = tree.getroot()
+          misses = 0
+          for cls in root.findall('.//class'):
+              for line in cls.findall('.//line'):
+                  if line.get('hits') == '0':
+                      misses += 1
+          print(misses)
+          " 2>/dev/null || echo "0")
+          fi
+          
           # Calculate combined percentage
-          TOTAL_STMTS=$((LOADER_STMTS + SCRAPER_STMTS))
-          TOTAL_MISS=$((LOADER_MISS + SCRAPER_MISS))
+          TOTAL_STMTS=$((LOADER_STMTS + SCRAPER_STMTS + CHATTER_STMTS))
+          TOTAL_MISS=$((LOADER_MISS + SCRAPER_MISS + CHATTER_MISS))
           if [ "$TOTAL_STMTS" -gt 0 ]; then
             COMBINED_PCT=$(python3 -c "print(f'{(($TOTAL_STMTS - $TOTAL_MISS) / $TOTAL_STMTS) * 100:.1f}%')")
           else
@@ -300,6 +392,7 @@ jobs:
           echo "|---------|----------|-------|--------|" >> coverage-summary.txt
           echo "| Loader | $LOADER_PCT | $LOADER_STMTS | $LOADER_MISS |" >> coverage-summary.txt
           echo "| Scraper | $SCRAPER_PCT | $SCRAPER_STMTS | $SCRAPER_MISS |" >> coverage-summary.txt
+          echo "| Chatter | $CHATTER_PCT | $CHATTER_STMTS | $CHATTER_MISS |" >> coverage-summary.txt
           echo "| **Combined** | **$COMBINED_PCT** | **$TOTAL_STMTS** | **$TOTAL_MISS** |" >> coverage-summary.txt
           echo "" >> coverage-summary.txt
           
@@ -337,6 +430,23 @@ jobs:
           fi
           echo '```' >> coverage-summary.txt
           
+          echo "" >> coverage-summary.txt
+          echo "### Chatter Details" >> coverage-summary.txt
+          echo '```' >> coverage-summary.txt
+          CHATTER_COV=$(find coverage-chatter -name ".coverage" | head -1)
+          if [ -n "$CHATTER_COV" ] && [ -f "$CHATTER_COV" ]; then
+            cd $(dirname "$CHATTER_COV")
+            cat > .coveragerc << 'EOF'
+          [run]
+          omit = tests/*, test/*, conftest.py
+          EOF
+            coverage report >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
+            cd "$GITHUB_WORKSPACE"
+          else
+            echo "No .coverage file found" >> coverage-summary.txt
+          fi
+          echo '```' >> coverage-summary.txt
+          
           cat coverage-summary.txt
           
           # Copy HTML reports
@@ -345,6 +455,9 @@ jobs:
           fi
           if [ -n "$SCRAPER_HTML" ] && [ -d "$SCRAPER_HTML" ]; then
             cp -r "$SCRAPER_HTML" htmlcov-combined/scraper
+          fi
+          if [ -n "$CHATTER_HTML" ] && [ -d "$CHATTER_HTML" ]; then
+            cp -r "$CHATTER_HTML" htmlcov-combined/chatter
           fi
           
           # Create index page
@@ -372,6 +485,7 @@ jobs:
               <tr><th>Service</th><th>Coverage</th><th>Lines</th><th>Missed</th></tr>
               <tr><td>Loader</td><td>$LOADER_PCT</td><td>$LOADER_STMTS</td><td>$LOADER_MISS</td></tr>
               <tr><td>Scraper</td><td>$SCRAPER_PCT</td><td>$SCRAPER_STMTS</td><td>$SCRAPER_MISS</td></tr>
+              <tr><td>Chatter</td><td>$CHATTER_PCT</td><td>$CHATTER_STMTS</td><td>$CHATTER_MISS</td></tr>
               <tr class="combined"><td>Combined</td><td>$COMBINED_PCT</td><td>$TOTAL_STMTS</td><td>$TOTAL_MISS</td></tr>
             </table>
             
@@ -379,6 +493,7 @@ jobs:
             <ul>
               <li><a href="loader/index.html">Loader Coverage Details</a></li>
               <li><a href="scraper/index.html">Scraper Coverage Details</a></li>
+              <li><a href="chatter/index.html">Chatter Coverage Details</a></li>
             </ul>
           </body>
           </html>
@@ -399,7 +514,7 @@ jobs:
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
-    needs: [system-tests-loader, unit-tests-scraper]
+    needs: [system-tests-loader, unit-tests-scraper, unit-tests-chatter]
     
     steps:
       - uses: actions/checkout@v4
@@ -474,7 +589,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [lint-loader, unit-tests-loader, integration-tests-loader, system-tests-loader, lint-scraper, unit-tests-scraper, coverage-report, deploy]
+    needs: [lint-loader, unit-tests-loader, integration-tests-loader, system-tests-loader, lint-scraper, unit-tests-scraper, lint-chatter, unit-tests-chatter, coverage-report, deploy]
     if: always()
     steps:
       - name: Summary
@@ -495,8 +610,15 @@ jobs:
           echo "| Lint | ${{ needs.lint-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit | ${{ needs.unit-tests-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Chatter" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint-chatter.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit | ${{ needs.unit-tests-chatter.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Coverage & Deploy" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Coverage | ${{ needs.coverage-report.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          

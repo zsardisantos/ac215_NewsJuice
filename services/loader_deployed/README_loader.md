@@ -11,6 +11,8 @@ Uses Vertex AI for embeddings of the chunks
 - `recursive-split` recursive splitting (**CHOSEN**)
 - `semantic-split` (using embedding model below
 
+
+
 Database Information
 - **Account:** `harvardnewsjuice@gmail.com`  
 - **Project:** `NewsJuice`  
