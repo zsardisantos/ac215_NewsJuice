@@ -18,7 +18,7 @@ client = TestClient(app, raise_server_exceptions=False)
 
 
 def test_health_check():
-    """ Health check endpoint"""
+    """Health check endpoint"""
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
@@ -27,7 +27,7 @@ def test_health_check():
 @patch("main.verify_token")
 @patch("main.create_user")
 def test_create_user_success(mock_create_user, mock_verify_token):
-    """ Create user endpoint - Success"""
+    """Create user endpoint - Success"""
     mock_verify_token.return_value = {"uid": "test_uid", "email": "test@example.com"}
     mock_create_user.return_value = True
 
@@ -41,7 +41,7 @@ def test_create_user_success(mock_create_user, mock_verify_token):
 
 @patch("main.verify_token")
 def test_create_user_unauthorized(mock_verify_token):
-    """ Create user endpoint - Unauthorized"""
+    """Create user endpoint - Unauthorized"""
     mock_verify_token.side_effect = Exception("Invalid token")
 
     headers = {"Authorization": "Bearer invalid_token"}
@@ -57,7 +57,7 @@ def test_create_user_unauthorized(mock_verify_token):
 @patch("main.verify_token")
 @patch("main.get_user_preferences")
 def test_get_preferences_success(mock_get_prefs, mock_verify_token):
-    """ Get preferences - Success"""
+    """Get preferences - Success"""
     mock_verify_token.return_value = {"uid": "test_uid"}
     mock_get_prefs.return_value = {"theme": "dark"}
 
@@ -73,7 +73,7 @@ def test_get_preferences_success(mock_get_prefs, mock_verify_token):
 @patch("main.save_user_preferences")
 @patch("main.create_user")
 def test_save_preferences_success(mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect):
-    """ Save preferences - Success"""
+    """Save preferences - Success"""
     mock_verify_token.return_value = {"uid": "test_uid"}
     mock_create_user.return_value = True
     mock_save_prefs.return_value = True
@@ -90,7 +90,7 @@ def test_save_preferences_success(mock_create_user, mock_save_prefs, mock_verify
 @patch("main.verify_token")
 @patch("main.get_audio_history")
 def test_get_history_success(mock_get_history, mock_verify_token):
-    """ Get history - Success"""
+    """Get history - Success"""
     mock_verify_token.return_value = {"uid": "test_uid"}
     mock_history = [{"id": 1, "text": "hello"}]
     mock_get_history.return_value = mock_history
@@ -103,7 +103,7 @@ def test_get_history_success(mock_get_history, mock_verify_token):
 
 
 def test_websocket_connect():
-    """ WebSocket connection - No token (should still accept)"""
+    """WebSocket connection - No token (should still accept)"""
     with client.websocket_connect("/ws/chat") as _:
         # Just check if connection is accepted
         pass
@@ -111,7 +111,7 @@ def test_websocket_connect():
 
 @patch("main.verify_token")
 def test_websocket_auth_valid(mock_verify_token):
-    """ WebSocket connection - Valid token"""
+    """WebSocket connection - Valid token"""
     mock_verify_token.return_value = {"uid": "test_uid"}
 
     with client.websocket_connect("/ws/chat?token=valid_token") as _:
@@ -123,7 +123,7 @@ def test_websocket_auth_valid(mock_verify_token):
 
 @patch("main.verify_token")
 def test_websocket_auth_invalid(mock_verify_token):
-    """ WebSocket connection - Invalid token"""
+    """WebSocket connection - Invalid token"""
     mock_verify_token.side_effect = Exception("Token expired")
 
     with client.websocket_connect("/ws/chat?token=bad_token") as websocket:
@@ -133,7 +133,7 @@ def test_websocket_auth_invalid(mock_verify_token):
 
 
 def test_websocket_audio_handling():
-    """ WebSocket - Sending audio chunks and complete signal"""
+    """WebSocket - Sending audio chunks and complete signal"""
     with client.websocket_connect("/ws/chat") as websocket:
         # 1. Send JSON audio data
         import base64
@@ -167,7 +167,7 @@ def test_websocket_audio_handling():
 
 
 def test_websocket_reset():
-    """ WebSocket - Reset functionality"""
+    """WebSocket - Reset functionality"""
     with client.websocket_connect("/ws/chat") as websocket:
         websocket.send_json({"type": "reset"})
         response = websocket.receive_json()
@@ -177,7 +177,7 @@ def test_websocket_reset():
 @patch("main.verify_token")
 @patch("main.create_user")
 def test_create_user_db_failure(mock_create_user, mock_verify_token):
-    """ Create user endpoint - Database Failure"""
+    """Create user endpoint - Database Failure"""
     mock_verify_token.return_value = {"uid": "test_uid", "email": "test@example.com"}
     mock_create_user.return_value = False  # Simulate DB failure
 
@@ -193,7 +193,7 @@ def test_create_user_db_failure(mock_create_user, mock_verify_token):
 @patch("main.save_user_preferences")
 @patch("main.create_user")
 def test_save_preferences_failure(mock_create_user, mock_save_prefs, mock_verify_token, mock_psycopg_connect):
-    """ Save preferences - Database Failure"""
+    """Save preferences - Database Failure"""
     mock_verify_token.return_value = {"uid": "test_uid"}
     mock_create_user.return_value = True
     mock_save_prefs.return_value = False  # DB Failure
@@ -228,7 +228,7 @@ def test_generate_daily_brief_success(
     mock_get_prefs,
     mock_verify_token,
 ):
-    """ Generate Daily Brief - Success"""
+    """Generate Daily Brief - Success"""
     # 1. Auth Setup
     mock_verify_token.return_value = {"uid": "test_uid"}
 
