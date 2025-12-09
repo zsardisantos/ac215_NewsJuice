@@ -199,7 +199,6 @@ gcloud iam service-accounts create cloud-run-invoker \
   --project newsjuice-123456
 ```
 
-
 Grant permissions:
 ```bash
 gcloud run services add-iam-policy-binding article-loader \
