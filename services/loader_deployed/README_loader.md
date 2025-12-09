@@ -192,7 +192,6 @@ gcloud run services list --region us-central1
 
 ## Set up Scheduler
 
-
 Create SA (cloud-run-invoker):
 ```bash
 gcloud iam service-accounts create cloud-run-invoker \
