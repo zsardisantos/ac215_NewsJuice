@@ -1,6 +1,5 @@
 name: CI/CD - NewsJuice Services
 
-
 on:
   push:
     branches: [main, develop]
@@ -36,7 +35,7 @@ jobs:
       - run: flake8 services/loader_deployed/*.py --max-line-length=120 || true
 
   # ============================================================
-  # LOADER - UNIT TESTS (with coverage)
+  # LOADER - UNIT TESTS
   # ============================================================
   unit-tests-loader:
     name: Unit Tests Loader
@@ -134,7 +133,7 @@ jobs:
       - run: flake8 services/scraper_deployed/*.py --max-line-length=120 || true
 
   # ============================================================
-  # SCRAPER - UNIT TESTS (with coverage)
+  # SCRAPER - UNIT TESTS
   # ============================================================
   unit-tests-scraper:
     name: Unit Tests Scraper
@@ -158,7 +157,7 @@ jobs:
             services/scraper_deployed/htmlcov/
 
   # ============================================================
-  # COMBINED COVERAGE REPORT (NEW)
+  # COMBINED COVERAGE REPORT
   # ============================================================
   coverage-report:
     name: Coverage Report
@@ -187,11 +186,47 @@ jobs:
       - name: Install coverage
         run: pip install coverage
       
-      - name: Combine and report
+      - name: Generate combined report
         run: |
-          coverage combine coverage-loader/.coverage coverage-scraper/.coverage || true
-          coverage report --show-missing || true
-          coverage html -d htmlcov-combined || true
+          mkdir -p htmlcov-combined
+          
+          # Create summary
+          echo "## Combined Coverage Report" > coverage-summary.txt
+          echo "" >> coverage-summary.txt
+          
+          echo "### Loader Coverage" >> coverage-summary.txt
+          if [ -f coverage-loader/.coverage ]; then
+            cd coverage-loader && coverage report >> ../coverage-summary.txt || echo "Loader report failed" >> ../coverage-summary.txt
+            cd ..
+          fi
+          
+          echo "" >> coverage-summary.txt
+          echo "### Scraper Coverage" >> coverage-summary.txt
+          if [ -f coverage-scraper/.coverage ]; then
+            cd coverage-scraper && coverage report >> ../coverage-summary.txt || echo "Scraper report failed" >> ../coverage-summary.txt
+            cd ..
+          fi
+          
+          cat coverage-summary.txt
+          
+          # Copy HTML reports
+          cp -r coverage-loader/htmlcov htmlcov-combined/loader || true
+          cp -r coverage-scraper/htmlcov htmlcov-combined/scraper || true
+          
+          # Create index page
+          cat > htmlcov-combined/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>Combined Coverage Report</title></head>
+          <body>
+            <h1>NewsJuice Coverage Reports</h1>
+            <ul>
+              <li><a href="loader/index.html">Loader Coverage</a></li>
+              <li><a href="scraper/index.html">Scraper Coverage</a></li>
+            </ul>
+          </body>
+          </html>
+          HTMLEOF
       
       - name: Upload combined coverage
         uses: actions/upload-artifact@v4
@@ -200,15 +235,10 @@ jobs:
           path: htmlcov-combined/
       
       - name: Coverage summary
-        run: |
-          echo "## Combined Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          coverage report >> $GITHUB_STEP_SUMMARY || echo "Coverage report unavailable" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+        run: cat coverage-summary.txt >> $GITHUB_STEP_SUMMARY
 
   # ============================================================
-  # DEPLOY (ORIGINAL WORKING VERSION)
+  # DEPLOY
   # ============================================================
   deploy:
     name: Deploy to GKE
