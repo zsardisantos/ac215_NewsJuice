@@ -1,6 +1,5 @@
 name: CI/CD - NewsJuice Services
 
-
 on:
   push:
     branches: [main, develop]
@@ -50,7 +49,12 @@ jobs:
         working-directory: services/loader_deployed
         run: |
           uv sync --all-extras
-          uv run pytest tests/unit/ -v --tb=short --cov=. --cov-report=term --cov-report=xml:coverage.xml --cov-report=html
+          uv run pytest tests/unit/ -v --tb=short \
+            --cov=. \
+            --cov-omit="tests/*,test/*,conftest.py" \
+            --cov-report=term \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
@@ -149,7 +153,12 @@ jobs:
         working-directory: services/scraper_deployed
         run: |
           uv sync --all-extras
-          uv run pytest tests/unit/ -v --tb=short --cov=. --cov-report=term --cov-report=xml:coverage.xml --cov-report=html
+          uv run pytest tests/unit/ -v --tb=short \
+            --cov=. \
+            --cov-omit="tests/*,test/*,conftest.py" \
+            --cov-report=term \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
@@ -223,12 +232,10 @@ jobs:
           import xml.etree.ElementTree as ET
           tree = ET.parse('$LOADER_XML')
           root = tree.getroot()
-          stmts = sum(int(p.get('hits', 0)) + int(p.get('misses', 0)) for p in root.findall('.//package'))
-          # Fallback: count lines
-          if stmts == 0:
-              for cls in root.findall('.//class'):
-                  for line in cls.findall('.//line'):
-                      stmts += 1
+          stmts = 0
+          for cls in root.findall('.//class'):
+              for line in cls.findall('.//line'):
+                  stmts += 1
           print(stmts)
           " 2>/dev/null || echo "0")
             LOADER_MISS=$(python3 -c "
@@ -297,7 +304,7 @@ jobs:
           LOADER_COV=$(find coverage-loader -name ".coverage" | head -1)
           if [ -n "$LOADER_COV" ] && [ -f "$LOADER_COV" ]; then
             cd $(dirname "$LOADER_COV")
-            coverage report >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
+            coverage report --omit="tests/*,test/*,conftest.py" >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
             cd "$GITHUB_WORKSPACE"
           else
             echo "No .coverage file found" >> coverage-summary.txt
@@ -310,7 +317,7 @@ jobs:
           SCRAPER_COV=$(find coverage-scraper -name ".coverage" | head -1)
           if [ -n "$SCRAPER_COV" ] && [ -f "$SCRAPER_COV" ]; then
             cd $(dirname "$SCRAPER_COV")
-            coverage report >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
+            coverage report --omit="tests/*,test/*,conftest.py" >> "$GITHUB_WORKSPACE/coverage-summary.txt" 2>&1 || echo "Report failed" >> "$GITHUB_WORKSPACE/coverage-summary.txt"
             cd "$GITHUB_WORKSPACE"
           else
             echo "No .coverage file found" >> coverage-summary.txt
