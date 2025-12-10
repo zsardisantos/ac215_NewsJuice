@@ -1,3 +1,4 @@
+![NewsJuice logo](./Newsjuice.png)
 # NewsJuice Deployment Guide
 
 Please find a detailed Deployment Architecture diagam below.

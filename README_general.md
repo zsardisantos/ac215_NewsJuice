@@ -1,4 +1,4 @@
-# 📆 NewsJuice (AC215 - Milestone 4)
+# NewsJuice (AC215 - Milestone 5)
 
 > Personalized daily podcast summaries of Harvard-related news — built with a scalable RAG pipeline, real-time voice interaction, and user authentication.
 
@@ -22,19 +22,19 @@ It is primarily designed for the **Harvard community**, pulling content from Har
 
 ## Explanation about the README-files organization
 
-0. A decription of the main folders and files can be found in README_Repository_Organization.md
+0. A decription of the main folders and files can be found in *README_Repository_Organization.md*
 
-1. The main changes versus Milestone 3 can be found in README_Changes_MS_4.md
+1. The main changes versus Milestone 4 can be found in *README_Changes_MS_4-MS_5.md*
 
-3. you will find in the Docs folder:
+3. You will find in the docs folder:
 
-    a. A detailed description of the app can be found in the docs/Application_Design_Document/APPLICATION_DESIGN.md
+    a. A detailed description of the app in *docs/Application_Design_Document/APPLICATION_DESIGN.md*
 
-    b. A detailed description of the CI/CD test suit can be found in docs/CI_Evidence/README_testing_loader.md
+    b. A detailed description of the CI/CD set-up in *docs/CI_CD_set-up_and_evidence/README_Deployment_Guide_CI-CD.md*
 
-    c. A detailed description of the Data Versioning approach can be found in docs/Data_Versioning_documentation/README_data_versioning.md
+    c. A detailed description of the Data Versioning approach can be found in *docs/Data_Versioning_documentation/README_data_versioning.md*
 
-4. A detailed description of Finetuning can be found in Finetuning/README.md
+4. A detailed description of Finetuning can be found in *docs/Finetuning_documentation/README.md*
 
 Each service contains a README with a more detailed description
 - README_loader_deployed

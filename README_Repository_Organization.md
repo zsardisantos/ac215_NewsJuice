@@ -1,11 +1,67 @@
-# Structure of the repository
+# 📁 Structure of the Repository
 
+This README describes the folder organization of the NewsJuice project.
 
+---
+
+## 🗂️ Project Root
+
+| Folder/File | Description |
+|-------------|-------------|
+| `services/` | Containerized microservices |
+| `docs/` | Documentation for project submissions |
+| `.github/` | CI/CD workflow configurations |
+| `Finetuning/` | Model fine-tuning resources |
+| `.gitignore` | Git ignore rules |
+| `README*.md` | Various README files (see README_general for descriptions) |
+
+---
+
+## 📂 Folder Descriptions
+
+### `.github/`
+
+Contains the workflow file for the CI/CD GitHub Actions workflow (`ci_combined_trigger_pulumi.yaml`)
+
+### `docs/`
+
+Contains documentation folders for MS4 submission:
+
+- `Application_Design_Document/`
+- `CI_CD_set-up_and_evidence/`
+- `Data_Versioning_documentation/`
+- `Finetuning_documentation/`
+- `File: MEDIUM_BLOG_POST.md`
+- `images (various images for *.md files)`
+
+### `services/`
+
+Contains self-contained containerized microservices:
+
+| Service | Description |
+|---------|-------------|
+| `scraper_deployed/` | Scraper - deployed version |
+| `loader_deployed/` | Loader - deployed version |
+| `chatter_deployed/` | Chatter - deployed version |
+| `frontend/` | Frontend - deployed version |
+| `deployment/` | Deployment setup for Pulumi/Kubernetes |
+| `data_versioner/` | Data Versioning module (hybrid SQL snapshot + DVC) |
+| `finetuning/` | Fine-tuning exercises for the LLM |
+
+#### Fine-tuning Modules
+
+1. Fine-tuning for podcast generation
+2. Fine-tuning for article classification
+
+---
+
+## 🌳 Detailed Services Structure
+
+> Secondary files (e.g., for local testing, dotfiles and others like __*__ files etc.) are omitted.
 ```
 services/
 ├── loader_deployed/
 │   ├── loader.py
-│   ├── loader_modular.py
 │   ├── main.py
 │   ├── Dockerfile
 │   ├── pyproject.toml
@@ -80,44 +136,3 @@ services/
     ├── docker-shell.sh
     └── docker-entrypoint.sh
 ```
-
-
-**.github/**
-Contains the workflow file for the CI/CD GitHub Actions workflow (ci_full.yaml)
-
-**docs/** Contains folder with documentation for submission of MS_4  
-- Application_Design_Document
-- Data_Versioning_documentation
-- CI_Evidence
-- Finetuning documentation  
-
-(Note regarding testing: in services we have a script **combined_unit_test.sh** which generated the unitn test with a combined coverage for all three main services: scraper, loader and chatter.)  
-
-
-The **services/** folder contains folders each of which is a self-contained containerized  micro-service:  
-
-- **scraper_deployed/**
-scraper version - currently deployed on Cloud Run and running on Scheduler every 24 h
-
-- **loader_deployed/**
-loader version - currently deployed on Cloud Run and running on Scheduler every 24 h
-
-- **loader_testing/**
-A version of the loader service with a full test suit added (incl. CI/CD workflow)
-
-- **chatter_deployed/**
-Contains the version of the chatter service 
-
-- **frontend/**
-Contains the frontend
-
-- **finetuning/**
-Contains the 2 finetuning exercise for the LLM
-    1. Finetuning for podcast generation.
-    2. Finetuning for article Classification
-
-- **data_versioner/**
-Contains the files for the Data Versioning module (hybrid SQL snapshot + DVC)
-
-**Archive/**
-Older files and versions (not relevant for submission)
