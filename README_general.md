@@ -20,7 +20,7 @@
 **NewsJuice** is an application that generates a **customized podcasts** summarizing the latest news based on the user’s interests.
 It is primarily designed for the **Harvard community**, pulling content from Harvard-related news sources.
 
-## Explanation about the README-files organization
+## Explanation of the README-files organization
 
 0. A decription of the main folders and files can be found in *README_Repository_Organization.md*
 
