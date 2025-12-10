@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Menu, Mic, MicOff, Settings as SettingsIcon, Info, Sparkles, Sliders, Clock, Play, Pause, SkipBack, SkipForward, StopCircle } from 'lucide-react'
+import { ArrowLeft, Menu, Mic, MicOff, Settings as SettingsIcon, Info, Sliders, Clock, Play, Pause, StopCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import AnimatedOrb from '../components/AnimatedOrb'
-import OrbSelector, { OrbStyle1, OrbStyle2, OrbStyle3, OrbStyle4, OrbStyle5, OrbStyle6, OrbStyle7, OrbStyle8, OrbStyle9, OrbStyle10 } from '../components/OrbSelector'
+// Removed orb components
 import { useVAD } from '../hooks/useVAD'
 
 function Podcast() {
@@ -23,10 +22,17 @@ function Podcast() {
   // ========== Q&A STATE (EXISTING) ==========
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [statusMessage, setStatusMessage] = useState("Go ahead, I'm listening")
+  // Helper function to get default status message based on VAD state
+  const getDefaultStatusMessage = () => {
+    return vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question"
+  }
+  const [statusMessage, setStatusMessage] = useState(() => {
+    const saved = localStorage.getItem('vad_enabled')
+    const isVadEnabled = saved === 'true'
+    return isVadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question"
+  })
   const [menuOpen, setMenuOpen] = useState(false)
-  const [showOrbSelector, setShowOrbSelector] = useState(false)
-  const [selectedOrb, setSelectedOrb] = useState(1)
+  // Removed orb selector state
 
   // WebSocket and audio refs (EXISTING)
   const wsRef = useRef(null)
@@ -82,6 +88,10 @@ function Podcast() {
     // Save VAD preference to localStorage whenever it changes
     localStorage.setItem('vad_enabled', vadEnabled.toString())
     console.log('[vad] Preference saved:', vadEnabled)
+    // Update status message when VAD state changes (if not in active state)
+    if (!isRecording && !isPlaying && audioMode === 'IDLE') {
+      setStatusMessage(vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
+    }
   }, [vadEnabled])
 
   // Handle voice interruption when VAD detects speech
@@ -305,7 +315,7 @@ function Podcast() {
     }
   }
 
-  // Check if daily brief was generated today
+  // Check if daily brief was generated today and if preferences changed
   const checkDailyBriefStatus = async () => {
     try {
       const response = await fetch(`${getApiUrl()}/api/daily-brief/status`, {
@@ -314,14 +324,19 @@ function Podcast() {
 
       if (!response.ok) {
         console.error('[daily-brief] Status check failed:', response.status)
-        return false
+        return { generated_today: false, preferences_changed: false, voice_only_changed: false }
       }
 
       const data = await response.json()
-      return data.generated_today
+      console.log('[daily-brief] Status:', data)
+      return {
+        generated_today: data.generated_today || false,
+        preferences_changed: data.preferences_changed || false,
+        voice_only_changed: data.voice_only_changed || false
+      }
     } catch (error) {
       console.error('[daily-brief] Error checking status:', error)
-      return false
+      return { generated_today: false, preferences_changed: false, voice_only_changed: false }
     }
   }
 
@@ -386,9 +401,17 @@ function Podcast() {
     console.log('[daily-brief] Checking if generation needed...')
     setIsLoadingBrief(true)
 
-    const generatedToday = await checkDailyBriefStatus()
+    const status = await checkDailyBriefStatus()
 
-    if (generatedToday) {
+    // If preferences changed (content or voice), regenerate
+    if (status.preferences_changed || status.voice_only_changed) {
+      console.log('[daily-brief] Preferences changed, regenerating...', {
+        content: status.preferences_changed,
+        voice: status.voice_only_changed
+      })
+      setIsLoadingBrief(false)
+      await generateDailyBrief()
+    } else if (status.generated_today) {
       console.log('[daily-brief] Already generated today, loading latest...')
       const latest = await loadLatestDailyBrief()
       if (latest) {
@@ -539,12 +562,12 @@ function Podcast() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Skip forward 10 seconds
+  // Skip forward 30 seconds
   const skipForward = () => {
     if (briefAudioRef.current && dailyBrief) {
       const newTime = Math.min(
-        briefAudioRef.current.currentTime + 10,
-        briefAudioRef.current.duration || briefAudioProgress + 10
+        briefAudioRef.current.currentTime + 30,
+        briefAudioRef.current.duration || briefAudioProgress + 30
       )
       briefAudioRef.current.currentTime = newTime
       console.log(`[daily-brief] Skipped forward to ${newTime}s`)
@@ -800,7 +823,7 @@ function Podcast() {
 
         audioPlayerRef.current.onended = () => {
           setIsPlaying(false)
-          setStatusMessage("Go ahead, I'm listening")
+          setStatusMessage(vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
 
           // [Phase 1] AUTO-RESUME DAILY BRIEF AFTER Q&A
           // Don't auto-resume if user is in follow-up mode (asking multiple questions)
@@ -1028,7 +1051,7 @@ function Podcast() {
       setStatusMessage("No speech detected. Press the button and speak your question.")
 
       setTimeout(() => {
-        setStatusMessage("Go ahead, I'm listening")
+        setStatusMessage(vadEnabledRef.current ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
       }, 3000)
 
       return
@@ -1081,7 +1104,7 @@ function Podcast() {
           }
 
           setTimeout(() => {
-            setStatusMessage("Go ahead, I'm listening")
+            setStatusMessage(vadEnabledRef.current ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
           }, 3000)
         }, 30000)  // 30 second timeout
 
@@ -1090,7 +1113,7 @@ function Podcast() {
 
         if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
           setStatusMessage("Connection lost. Please try again.")
-          setTimeout(() => setStatusMessage("Go ahead, I'm listening"), 3000)
+          setTimeout(() => setStatusMessage(vadEnabledRef.current ? "Ask away, I'm ready!" : "Click the microphone to ask a question"), 3000)
         } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
           setStatusMessage("Connecting...")
           const originalWs = wsRef.current
@@ -1109,7 +1132,7 @@ function Podcast() {
                   wsRef.current.close()
                   wsRef.current = null
                 }
-                setTimeout(() => setStatusMessage("Go ahead, I'm listening"), 3000)
+                setTimeout(() => setStatusMessage(vadEnabledRef.current ? "Ask away, I'm ready!" : "Click the microphone to ask a question"), 3000)
               }, 30000)
             }
           }, { once: true })
@@ -1141,7 +1164,7 @@ function Podcast() {
     if (shouldAutoResume.current && briefAudioRef.current) {
       setStatusMessage("Q&A stopped. Press play above to resume your brief.")
     } else {
-      setStatusMessage("Go ahead, I'm listening")
+      setStatusMessage(vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
     }
   }
 
@@ -1280,22 +1303,7 @@ function Podcast() {
 
   // ========== UI HELPERS ==========
 
-  const handleOrbSelection = (orbId) => {
-    if (orbId !== null) {
-      setSelectedOrb(orbId)
-    }
-    setShowOrbSelector(false)
-  }
-
-  const getOrbComponent = () => {
-    const orbMap = {
-      1: OrbStyle1, 2: OrbStyle2, 3: OrbStyle3, 4: OrbStyle4, 5: OrbStyle5,
-      6: OrbStyle6, 7: OrbStyle7, 8: OrbStyle8, 9: OrbStyle9, 10: OrbStyle10,
-    }
-    return orbMap[selectedOrb] || OrbStyle1
-  }
-
-  const SelectedOrbComponent = getOrbComponent()
+  // Removed orb selection handlers
 
   // ========== RENDER ==========
 
@@ -1466,14 +1474,36 @@ function Podcast() {
               <div className="space-y-4">
                 {/* Play Button and Progress */}
                 <div className="flex items-center gap-4">
-                  {/* Skip Backward Button */}
+                  {/* Skip Backward Button - Partial Circle with 10 */}
                   <button
                     onClick={skipBackward}
                     disabled={!dailyBrief}
-                    className="w-12 h-12 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="relative w-14 h-14 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Skip backward 10 seconds"
                   >
-                    <SkipBack size={20} />
+                    <svg className="w-full h-full" viewBox="0 0 56 56" fill="none">
+                      {/* Partial circle (3/4 circle, starts at bottom, goes counter-clockwise to left) */}
+                      <path
+                        d="M 28 54 A 26 26 0 1 0 2 28"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                        className="text-gray-400"
+                      />
+                      {/* Arrow pointing left at the end of the arc (left side) - larger */}
+                      <g transform="translate(2, 28)">
+                        <path
+                          d="M0 0 L-7 -4 M0 0 L-7 4"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-gray-300"
+                        />
+                      </g>
+                    </svg>
+                    {/* Number 10 */}
+                    <span className="absolute text-xs font-semibold text-gray-300">10</span>
                   </button>
 
                   {/* Play/Pause Button */}
@@ -1484,14 +1514,36 @@ function Podcast() {
                     {briefAudioPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
                   </button>
 
-                  {/* Skip Forward Button */}
+                  {/* Skip Forward Button - Partial Circle with 30 */}
                   <button
                     onClick={skipForward}
                     disabled={!dailyBrief}
-                    className="w-12 h-12 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Skip forward 10 seconds"
+                    className="relative w-14 h-14 bg-gray-800/50 hover:bg-gray-700/50 rounded-full flex items-center justify-center border border-gray-700 hover:border-pink-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Skip forward 30 seconds"
                   >
-                    <SkipForward size={20} />
+                    <svg className="w-full h-full" viewBox="0 0 56 56" fill="none">
+                      {/* Partial circle (3/4 circle, starts at bottom, goes clockwise to right) */}
+                      <path
+                        d="M 28 54 A 26 26 0 1 1 54 28"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                        className="text-gray-400"
+                      />
+                      {/* Arrow pointing right at the end of the arc (right side) - larger */}
+                      <g transform="translate(54, 28)">
+                        <path
+                          d="M0 0 L7 -4 M0 0 L7 4"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-gray-300"
+                        />
+                      </g>
+                    </svg>
+                    {/* Number 30 */}
+                    <span className="absolute text-xs font-semibold text-gray-300">30</span>
                   </button>
 
                   <div className="flex-1">
@@ -1553,75 +1605,65 @@ function Podcast() {
             <p className="text-gray-400">Click the microphone and speak your question</p>
           </div>
 
-          {/* Two Column Layout: Orb on right, controls on left */}
-          <div className="flex flex-col lg:flex-row lg:gap-12 items-center">
-
-            {/* Left: Controls and Status */}
-            <div className="w-full lg:w-1/2 flex flex-col items-center lg:items-start space-y-6">
+          {/* Centered Layout: Stacked Components */}
+          <div className="flex flex-col items-center space-y-6">
               {/* Status Message */}
               <motion.div
                 key={statusMessage}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="w-full px-6 py-3 bg-gray-800/50 rounded-full border border-gray-700 backdrop-blur-sm text-center"
+                className="w-full max-w-md px-6 py-3 bg-gray-800/50 rounded-full border border-gray-700 backdrop-blur-sm text-center"
               >
                 <p className="text-sm text-gray-300">{statusMessage}</p>
               </motion.div>
 
-              {/* Call Buttons */}
-              <div className="flex items-center gap-6">
-                {/* Voice Detection Toggle Switch */}
-                <div className="flex flex-col items-center gap-2">
-                  <label className="text-xs text-gray-400 font-medium">Voice Detection</label>
-                  <div className="relative inline-flex items-center">
-                    {/* Left label - Voice Detection */}
-                    <span className={`text-xs font-medium mr-2 transition-colors ${
-                      vadEnabled ? 'text-primary-pink' : 'text-gray-500'
-                    }`}>
-                      Voice Detection
-                    </span>
-                    
-                    {/* Toggle Switch */}
-                    <button
-                      type="button"
-                      onClick={() => setVadEnabled(!vadEnabled)}
-                      className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-pink focus:ring-offset-2 ${
-                        vadEnabled ? 'bg-primary-pink' : 'bg-gray-600'
+              {/* Main Speak Button */}
+              <motion.button
+                onClick={handleCallButton}
+                whileTap={{ scale: 0.95 }}
+                className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                  isRecording
+                    ? 'bg-red-600 shadow-red-500/50'
+                    : 'bg-gradient-to-br from-primary-pink to-pink-600 shadow-primary-pink/50'
+                }`}
+              >
+                {isRecording ? <Mic size={32} className="animate-pulse" /> : <Mic size={32} />}
+              </motion.button>
+
+              {/* Voice Detection Toggle Switch */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative inline-flex items-center">
+                  {/* Label - Hands-free (left side) */}
+                  <span className={`text-xs font-medium mr-3 transition-colors ${
+                    vadEnabled ? 'text-primary-pink' : 'text-gray-500'
+                  }`}>
+                    Hands-free
+                  </span>
+                  
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    onClick={() => setVadEnabled(!vadEnabled)}
+                    className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-pink focus:ring-offset-2 ${
+                      vadEnabled ? 'bg-primary-pink' : 'bg-gray-600'
+                    }`}
+                    role="switch"
+                    aria-checked={vadEnabled}
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                        vadEnabled ? 'translate-x-1' : 'translate-x-9'
                       }`}
-                      role="switch"
-                      aria-checked={vadEnabled}
-                    >
-                      <span
-                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                          vadEnabled ? 'translate-x-1' : 'translate-x-9'
-                        }`}
-                      />
-                    </button>
-                    
-                    {/* Right label - Manual */}
-                    <span className={`text-xs font-medium ml-2 transition-colors ${
-                      !vadEnabled ? 'text-primary-pink' : 'text-gray-500'
-                    }`}>
-                      Manual
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-500 text-center max-w-[100px]">
-                    {vadEnabled ? 'Hands-free' : 'Press to talk'}
+                    />
+                  </button>
+                  
+                  {/* Label - Manual mode (right side) */}
+                  <span className={`text-xs font-medium ml-3 transition-colors ${
+                    !vadEnabled ? 'text-primary-pink' : 'text-gray-500'
+                  }`}>
+                    Manual mode
                   </span>
                 </div>
-
-                {/* Main Speak Button */}
-                <motion.button
-                  onClick={handleCallButton}
-                  whileTap={{ scale: 0.95 }}
-                  className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                    isRecording
-                      ? 'bg-red-600 shadow-red-500/50'
-                      : 'bg-gradient-to-br from-primary-pink to-pink-600 shadow-primary-pink/50'
-                  }`}
-                >
-                  {isRecording ? <Mic size={32} className="animate-pulse" /> : <Mic size={32} />}
-                </motion.button>
               </div>
 
               {/* Stop Q&A Answer Button (shows when Q&A audio is playing) */}
@@ -1656,35 +1698,16 @@ function Podcast() {
               )}
 
               {/* Instructions */}
-              <div className="text-center lg:text-left text-gray-500 text-sm">
-                <p>Click the call button to start recording, click again to send</p>
+              <div className="text-center text-gray-500 text-sm">
+                {vadEnabled ? (
+                  <p>Ask your question, no buttons needed. Make sure you are in a quiet space.</p>
+                ) : (
+                  <p>Click the microphone button to start recording, click again to send</p>
+                )}
               </div>
-            </div>
-
-            {/* Right: Animated Orb */}
-            <div className="w-full lg:w-1/2 flex flex-col items-center mt-8 lg:mt-0">
-              <div className="relative">
-                <SelectedOrbComponent isPlaying={isPlaying} size="large" />
-                <button
-                  onClick={() => setShowOrbSelector(true)}
-                  className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 rounded-full text-xs flex items-center gap-2 border border-gray-600 transition-all"
-                >
-                  <Sparkles size={14} />
-                  <span>Change Style</span>
-                </button>
-              </div>
-            </div>
           </div>
         </section>
       </div>
-
-      {/* Orb Selector Modal */}
-      {showOrbSelector && (
-        <OrbSelector
-          onSelect={handleOrbSelection}
-          currentSelection={selectedOrb}
-        />
-      )}
     </div>
   )
 }
