@@ -26,6 +26,7 @@
 **Frontend** 
 - Improvment of features (manual/automatic voice detection Q&A modes)
 - Voice preferences
+- Numerous visual enhancements
 
 **Other**
 - Deployment: pulimi/kubernetes
