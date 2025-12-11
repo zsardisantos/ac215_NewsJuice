@@ -158,7 +158,7 @@ Force a run:
 
 ### EXTRAS
 
-How see what schduler jobs are on cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com:
+How see what scheduler jobs are on cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com:
 
 ```bash
 gcloud scheduler jobs list \
