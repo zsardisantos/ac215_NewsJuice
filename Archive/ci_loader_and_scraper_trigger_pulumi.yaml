@@ -1,0 +1,307 @@
+name: CI/CD - NewsJuice Services
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/loader_deployed/**'
+      - 'services/scraper_deployed/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/loader_deployed/**'
+      - 'services/scraper_deployed/**'
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT: newsjuice-123456
+  GCP_REGION: us-central1
+  GCP_ZONE: us-central1-a
+
+jobs:
+  # ============================================================
+  # LOADER - LINT
+  # ============================================================
+  lint-loader:
+    name: Lint Loader
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install flake8 black
+      - run: black --check services/loader_deployed/*.py || true
+      - run: flake8 services/loader_deployed/*.py --max-line-length=120 || true
+
+  # ============================================================
+  # LOADER - UNIT TESTS
+  # ============================================================
+  unit-tests-loader:
+    name: Unit Tests Loader
+    runs-on: ubuntu-latest
+    needs: lint-loader
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - name: Run tests with coverage
+        working-directory: services/loader_deployed
+        run: |
+          uv sync --all-extras
+          uv run pytest tests/unit/ -v --tb=short --cov=. --cov-report=term --cov-report=html
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-loader-unit
+          path: |
+            services/loader_deployed/.coverage
+            services/loader_deployed/htmlcov/
+
+  # ============================================================
+  # LOADER - INTEGRATION TESTS
+  # ============================================================
+  integration-tests-loader:
+    name: Integration Tests Loader
+    runs-on: ubuntu-latest
+    needs: lint-loader
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: newsdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - run: sudo apt-get install -y postgresql-client
+      - name: Init DB and run tests
+        working-directory: services/loader_deployed
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/newsdb_test
+          ARTICLES_TABLE_NAME: articles_test
+          VECTOR_TABLE_NAME: chunks_vector_test
+        run: |
+          PGPASSWORD=testpassword psql -h localhost -U postgres -d newsdb_test -f tests/setup/init_test_db.sql
+          uv sync --all-extras
+          uv run pytest tests/integration/ -v --tb=short
+
+  # ============================================================
+  # LOADER - SYSTEM TESTS
+  # ============================================================
+  system-tests-loader:
+    name: System Tests Loader
+    runs-on: ubuntu-latest
+    needs: [unit-tests-loader, integration-tests-loader]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run system tests
+        working-directory: services/loader_deployed
+        run: |
+          docker compose -f docker-compose.test.yml up -d --build
+          sleep 30
+          docker compose -f docker-compose.test.yml run --rm system-tests
+      - if: failure()
+        working-directory: services/loader_deployed
+        run: docker compose -f docker-compose.test.yml logs
+      - if: always()
+        working-directory: services/loader_deployed
+        run: docker compose -f docker-compose.test.yml down -v
+
+  # ============================================================
+  # SCRAPER - LINT
+  # ============================================================
+  lint-scraper:
+    name: Lint Scraper
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install flake8 black
+      - run: black --check services/scraper_deployed/*.py || true
+      - run: flake8 services/scraper_deployed/*.py --max-line-length=120 || true
+
+  # ============================================================
+  # SCRAPER - UNIT TESTS
+  # ============================================================
+  unit-tests-scraper:
+    name: Unit Tests Scraper
+    runs-on: ubuntu-latest
+    needs: lint-scraper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - name: Run tests with coverage
+        working-directory: services/scraper_deployed
+        run: |
+          uv sync --all-extras
+          uv run pytest tests/unit/ -v --tb=short --cov=. --cov-report=term --cov-report=html
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-scraper-unit
+          path: |
+            services/scraper_deployed/.coverage
+            services/scraper_deployed/htmlcov/
+
+  # ============================================================
+  # COMBINED COVERAGE REPORT
+  # ============================================================
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: [unit-tests-loader, unit-tests-scraper]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download loader coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-loader-unit
+          path: coverage-loader
+      
+      - name: Download scraper coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-scraper-unit
+          path: coverage-scraper
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install coverage
+        run: pip install coverage
+      
+      - name: Combine and report
+        run: |
+          coverage combine coverage-loader/.coverage coverage-scraper/.coverage || true
+          coverage report --show-missing || true
+          coverage html -d htmlcov-combined || true
+      
+      - name: Upload combined coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-combined
+          path: htmlcov-combined/
+      
+      - name: Coverage summary
+        run: |
+          echo "## Combined Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          coverage report >> $GITHUB_STEP_SUMMARY || echo "Coverage report unavailable" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================
+  # DEPLOY - Using deployment container
+  # ============================================================
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: [system-tests-loader, unit-tests-scraper]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Write GCP credentials
+        run: echo '${{ secrets.GCP_SA_KEY }}' > ${{ github.workspace }}/gcp-key.json
+      
+      - name: Build deployment container
+        working-directory: services/deployment
+        run: docker build -t deployer .
+      
+      - name: Deploy
+        run: |
+          docker run --rm \
+            --entrypoint /bin/bash \
+            -v ${{ github.workspace }}:/workspace \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -w /app \
+            deployer -c "
+              set -e
+              
+              # Authenticate
+              gcloud auth activate-service-account --key-file=/workspace/gcp-key.json
+              gcloud config set project ${{ env.GCP_PROJECT }}
+              gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+              
+              # Configure kubectl
+              gcloud container clusters get-credentials newsjuice-cluster \
+                --zone=${{ env.GCP_ZONE }} \
+                --project=${{ env.GCP_PROJECT }}
+              
+              # Create symlinks for Pulumi
+              ln -sf /workspace/services/loader_deployed /loader_deployed
+              ln -sf /workspace/services/scraper_deployed /scraper_deployed
+              ln -sf /workspace/services/chatter_deployed /chatter_deployed
+              ln -sf /workspace/services/frontend/podcast-app /frontend
+              
+              # Override Pulumi.yaml to use pip (no venv)
+              cat > /workspace/services/deployment/Pulumi.yaml << 'EOFPULUMI'
+          name: newsjuice-loader
+          runtime:
+            name: python
+            options:
+              toolchain: pip
+          description: NewsJuice Loader Service with Cloud SQL PostgreSQL
+          EOFPULUMI
+              
+              # Run Pulumi
+              cd /workspace/services/deployment
+              pulumi login gs://${{ env.GCP_PROJECT }}-pulumi-state-bucket
+              pulumi stack select dev
+              pulumi cancel --yes || true
+              pulumi refresh --yes --skip-preview || true
+              pulumi up --yes --skip-preview
+            "
+      
+      - name: Cleanup credentials
+        if: always()
+        run: rm -f ${{ github.workspace }}/gcp-key.json
+
+  # ============================================================
+  # SUMMARY
+  # ============================================================
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint-loader, unit-tests-loader, integration-tests-loader, system-tests-loader, lint-scraper, unit-tests-scraper, coverage-report, deploy]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## NewsJuice CI/CD Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Loader" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint-loader.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit | ${{ needs.unit-tests-loader.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration | ${{ needs.integration-tests-loader.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| System | ${{ needs.system-tests-loader.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Scraper" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit | ${{ needs.unit-tests-scraper.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage & Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ needs.coverage-report.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          

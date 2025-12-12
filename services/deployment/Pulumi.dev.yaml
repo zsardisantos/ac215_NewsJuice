@@ -1,0 +1,14 @@
+config:
+  gcp:project: newsjuice-123456
+  gcp:region: us-central1
+  gcp:zone: us-central1-a
+  newsjuice-loader:db_instance_name: newsdb-instance
+  newsjuice-loader:db_name: newsdb
+  newsjuice-loader:db_user: postgres
+  newsjuice-loader:db_password:
+    secure: v1:cnNijZYEjwdTkLER:6R28gJ0M1CtKNKTx05xGdM5PSJ8vRMXFI26Bhw==
+  newsjuice-loader:enable_cloudrun: false
+  newsjuice-loader:enable_gke: true
+  newsjuice-loader:gke_node_count: 2
+  newsjuice-loader:gke_machine_type: e2-standard-2  # 2 CPUs
+encryptionsalt: v1:byCAnUicoPE=:v1:g9LmUNlL5KT3RNCs:1WorgERU+PVnE9jgrLStJEMQfijekw==

@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@ricky0123/vad-react": "^0.0.36",
+    "@ricky0123/vad-web": "^0.0.30",
     "firebase": "^12.5.0",
     "framer-motion": "^10.16.16",
     "lucide-react": "^0.294.0",

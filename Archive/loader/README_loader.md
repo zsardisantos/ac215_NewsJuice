@@ -7,6 +7,7 @@
 - use the same embedder for final chunk embedding as Zac 
 
 
+
 Uses Vertex AI for embeddings of the chunks
 **Chunking option available**
 - `char-split` character splitting

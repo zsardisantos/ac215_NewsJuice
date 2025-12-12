@@ -1,48 +1,41 @@
-# Extractor Dockerfile
-FROM python:3.12-slim-bookworm
-
+# Builder stage - includes build tools
+FROM python:3.12-slim-bookworm as builder
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT=/home/app/.venv
 ENV VIRTUAL_ENV=/home/app/.venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-ENV PORT=8080
 
-
+# Only install build dependencies in builder
 RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends build-essential ffmpeg && \
+    apt-get install -y --no-install-recommends build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install uv
+RUN pip install --no-cache-dir uv
 
-# Set working directory 
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev
+
+# Runtime stage - much smaller
+FROM python:3.12-slim-bookworm
+ENV VIRTUAL_ENV=/home/app/.venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+ENV PORT=8080
+
+# Only install runtime dependencies (ffmpeg)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Create secrets directory for mounting
-RUN mkdir -p /app/secrets
+# Copy only the built venv from builder
+COPY --from=builder /home/app/.venv /home/app/.venv
 
-# Copy the source code
-#COPY --chown=app:app . ./
-COPY pyproject.toml ./
-
-#NEW
-COPY uv.lock ./
-
-#RUN uv sync
-RUN uv lock && uv sync --no-dev
-
+# Copy application code
 COPY . ./
 
-
 EXPOSE 8080
-
-
-#ENTRYPOINT ["/bin/bash"]
-#CMD ["-c", "source /home/app/.venv/bin/activate && exec bash"]
-# Default command (Compose will override with wait_for_db + your script)
-#CMD ["python", "main.py", "--out", "/data/news.jsonl"]
-
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
-# TEST
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -5,11 +5,15 @@ services/finetunning/qwen_qlora_podcast/
 Finetuning/finetuning-for-podcast/Output/
 Finetuning/finetuning-for-podcast/wandb/
 Finetuning/finetuning-for-classification/wandb/
+
 secrets/
-**/.env
+**/**/.env
 __pycache__/
 *.pyc
 logs/*.log
 **/.env.local
 **/OLD/
+
+services/deployment/pulumi-plugins/
+
 

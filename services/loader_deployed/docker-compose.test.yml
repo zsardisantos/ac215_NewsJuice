@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: newsdb_test
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./tests/setup/init_test_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  loader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:testpassword@postgres:5432/newsdb_test
+      ARTICLES_TABLE_NAME: articles_test
+      VECTOR_TABLE_NAME: chunks_vector_test
+      GOOGLE_CLOUD_PROJECT: test-project
+      GOOGLE_CLOUD_REGION: us-central1
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  unit-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      DATABASE_URL: postgresql://fake
+    command: uv run pytest tests/unit/ -v
+
+  integration-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      DATABASE_URL: postgresql://postgres:testpassword@postgres:5432/newsdb_test
+      ARTICLES_TABLE_NAME: articles_test
+      VECTOR_TABLE_NAME: chunks_vector_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uv run pytest tests/integration/ -v
+
+  system-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      LOADER_URL: http://loader:8080
+      DATABASE_URL: postgresql://postgres:testpassword@postgres:5432/newsdb_test
+      ARTICLES_TABLE_NAME: articles_test
+      VECTOR_TABLE_NAME: chunks_vector_test
+    depends_on:
+      loader:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    command: uv run pytest tests/system/ -v
+    

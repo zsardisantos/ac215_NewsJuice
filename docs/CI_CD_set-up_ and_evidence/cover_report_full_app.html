@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NewsJuice Coverage Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    h1 { color: #333; }
+    table { border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #4CAF50; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    .combined { font-weight: bold; background-color: #e7f3e7; }
+    a { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <h1>NewsJuice Coverage Report</h1>
+  
+  <h2>Summary</h2>
+  <table>
+    <tr><th>Service</th><th>Coverage</th><th>Lines</th><th>Missed</th></tr>
+    <tr><td>Loader</td><td>87.4%</td><td>207</td><td>26</td></tr>
+    <tr><td>Scraper</td><td>71.1%</td><td>1382</td><td>400</td></tr>
+    <tr><td>Chatter</td><td>43.4%</td><td>1199</td><td>679</td></tr>
+    <tr class="combined"><td>Combined</td><td>60.4%</td><td>2788</td><td>1105</td></tr>
+  </table>
+  
+  <h2>Detailed Reports</h2>
+  <ul>
+    <li><a href="loader/index.html">Loader Coverage Details</a></li>
+    <li><a href="scraper/index.html">Scraper Coverage Details</a></li>
+    <li><a href="chatter/index.html">Chatter Coverage Details</a></li>
+  </ul>
+</body>
+</html>

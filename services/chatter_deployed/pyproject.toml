@@ -14,9 +14,9 @@ dependencies = [
   "google-cloud-aiplatform>=1.122.0",
   "pgvector>=0.4.1",
   "python-dotenv>=1.1.1",
-  "sentence-transformers>=5.1.2",
   "google-genai",
   "google-cloud-speech>=2.20.0",
+  "google-cloud-texttospeech>=2.14.0",
   "firebase-admin>=6.0.0",
 ]
 

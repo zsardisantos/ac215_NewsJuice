@@ -6,48 +6,32 @@ function AboutUs() {
 
   const teamMembers = [
     {
-      name: 'Avery Smith',
-      role: 'CEO & Founder',
-      bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
+      name: 'Zac Sardi-Santos',
+      role: 'AI & Machine Learning Lead',
+      bio: 'Computer Science and Applied Math student at Harvard with a passion for AI, robotics, and building intelligent systems that transform how we interact with information.',
       image: '👤'
     },
     {
-      name: 'Jordan Lee',
-      role: 'Lead AI Engineer',
-      bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
+      name: 'Josh Rosenblum',
+      role: 'Audio & UX Designer',
+      bio: 'Bringing expertise in audio production and user experience design to create seamless, engaging voice interactions that feel natural and intuitive.',
       image: '👤'
     },
     {
-      name: 'Taylor Brown',
-      role: 'Product Designer',
-      bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
+      name: 'Khaled Aly',
+      role: 'Full-Stack Developer',
+      bio: 'Passionate about building scalable applications and creating elegant solutions that bridge the gap between complex technology and user-friendly experiences.',
       image: '👤'
     },
     {
-      name: 'Morgan Davis',
-      role: 'Content Strategist',
-      bio: 'I\'m not just here to talk, I\'m here to listen. I believe in the power of conversation to change the world.',
+      name: 'Christian Michel',
+      role: 'Backend & Infrastructure',
+      bio: 'Focused on building robust backend systems and cloud infrastructure that power real-time AI conversations and ensure seamless performance at scale.',
       image: '👤'
     }
   ]
 
-  const testimonials = [
-    {
-      name: 'Sarah Johnson',
-      text: 'This podcast app has completely transformed how I consume content. The AI interactions feel so natural!',
-      rating: 5
-    },
-    {
-      name: 'Michael Chen',
-      text: 'I love how personalized the experience is. It\'s like having a conversation with a knowledgeable friend.',
-      rating: 5
-    },
-    {
-      name: 'Emily Rodriguez',
-      text: 'The voice interaction is seamless and the content is always relevant. Highly recommend!',
-      rating: 5
-    }
-  ]
+
 
   return (
     <div className="min-h-screen bg-primary-darker text-white">
@@ -70,7 +54,7 @@ function AboutUs() {
         <section className="text-center space-y-4">
           <h2 className="text-3xl md:text-4xl font-bold">AI-Powered Podcast</h2>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            We're building the future of interactive audio experiences. Have conversations with AI that feel natural, 
+            We're building the future of interactive audio experiences. Have conversations with AI that feel natural,
             informative, and engaging.
           </p>
         </section>
@@ -114,53 +98,13 @@ function AboutUs() {
         <section className="bg-gradient-to-br from-primary-purple/20 to-primary-pink/10 rounded-2xl p-8 border border-primary-purple/30">
           <h3 className="text-2xl font-bold mb-4">Our Mission</h3>
           <p className="text-gray-300 leading-relaxed">
-            We believe in democratizing access to information through natural conversation. Our AI-powered podcast 
-            platform makes learning and discovery as simple as having a chat. Whether you're commuting, exercising, 
+            We believe in democratizing access to information through natural conversation. Our AI-powered podcast
+            platform makes learning and discovery as simple as having a chat. Whether you're commuting, exercising,
             or relaxing at home, we bring you personalized content that adapts to your interests and questions in real-time.
           </p>
         </section>
 
-        {/* Testimonials */}
-        <section className="space-y-8">
-          <h3 className="text-2xl font-bold text-center">Testimonials</h3>
-          <div className="space-y-4">
-            {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className="bg-gradient-to-br from-gray-800/30 to-gray-900/30 rounded-2xl p-6 border border-gray-700"
-              >
-                <div className="flex gap-1 mb-3">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <span key={i} className="text-primary-pink text-xl">★</span>
-                  ))}
-                </div>
-                <p className="text-gray-300 mb-4">{testimonial.text}</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary-pink to-primary-purple rounded-full flex items-center justify-center">
-                    👤
-                  </div>
-                  <span className="font-semibold">{testimonial.name}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
 
-        {/* Contact CTA */}
-        <section className="text-center space-y-6 py-8">
-          <h3 className="text-2xl font-bold">Get in touch</h3>
-          <p className="text-gray-400">Have questions or feedback? We'd love to hear from you!</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <input
-              type="email"
-              placeholder="Enter your e-mail address and get started"
-              className="w-full sm:w-96 px-6 py-4 bg-transparent border border-gray-700 rounded-full text-white placeholder-gray-500 focus:outline-none focus:border-primary-pink transition-colors"
-            />
-            <button className="px-8 py-4 bg-gradient-to-r from-primary-pink to-pink-500 rounded-full text-white font-semibold hover:shadow-lg hover:shadow-primary-pink/50 transition-all whitespace-nowrap">
-              Get Started
-            </button>
-          </div>
-        </section>
       </div>
     </div>
   )

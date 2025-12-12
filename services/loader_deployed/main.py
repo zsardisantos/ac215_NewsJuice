@@ -34,7 +34,7 @@ def health():
 @app.post("/process")
 def process(background_tasks: BackgroundTasks):
     logger.info("=== Starting background article processing ===")
-    background_tasks.add_task(chunk_embed_load, "semantic-split")
+    background_tasks.add_task(chunk_embed_load, "recursive-split")
     logger.info("Background task queued successfully")
     return {"status": "started"}
 
@@ -44,7 +44,7 @@ def process_sync():
     """Synchronous processing - waits for completion"""
     logger.info("=== Starting synchronous article processing ===")
     try:
-        result = chunk_embed_load(method="semantic-split")
+        result = chunk_embed_load(method="recursive-split")
         logger.info(f"Processing completed successfully: {result}")
         return result
     except Exception as e:
