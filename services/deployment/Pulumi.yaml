@@ -1,6 +1,6 @@
-name: newsjuice-loader
+name: newsjuice-infrastructure
 runtime:
   name: python
   options:
     virtualenv: /home/app/.venv
-description: NewsJuice Loader Service with Cloud SQL PostgreSQL
+description: NewsJuice multi-service deployment with GKE, Cloud Run, and Cloud SQL PostgreSQL
