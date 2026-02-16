@@ -57,9 +57,8 @@ SERVICES = [
         "source_dir": "/chatter_deployed",
         "extra_envs": [
             ("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,https://www.newsjuiceapp.com,https://newsjuiceapp.com"),
-            ("AUDIO_BUCKET", "newsjuice-123456-audio-bucket"),
+            ("AUDIO_BUCKET", "newsjuice-3-audio-bucket"),
             ("GCS_PREFIX", "podcasts/"),
-            ("GOOGLE_API_KEY", "AIzaSyA3rhw0aA-NvMtnG3F6Ivv5UIdYZdUhc1I"),
         ],
     },
     {
