@@ -7,7 +7,7 @@ services:
     command:
       - "--address=0.0.0.0"
       - "--port=5432"
-      - "newsjuice-123456:us-central1:newsdb-instance"
+      - "newsjuice-2:us-central1:newsdb-instance"
     volumes:
       - ../../../secrets/sa-key.json:/secrets/sa-key.json:ro
     environment:
@@ -37,7 +37,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       
       # Google Cloud
-      - GOOGLE_CLOUD_PROJECT=newsjuice-123456
+      - GOOGLE_CLOUD_PROJECT=newsjuice-2
       - GOOGLE_CLOUD_REGION=us-central1
       - GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/sa-key.json
       - GEMINI_SERVICE_ACCOUNT_PATH=/app/secrets/gemini-service-account.json

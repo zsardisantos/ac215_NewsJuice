@@ -2,8 +2,8 @@
 
 SERVICE_NAME="article-scraper"
 REGION="us-central1"
-PROJECT_ID="newsjuice-123456"
-SQL_INSTANCE="newsjuice-123456:us-central1:newsdb-instance"
+PROJECT_ID="newsjuice-2"
+SQL_INSTANCE="newsjuice-2:us-central1:newsdb-instance"
 
 echo "Deploying ${SERVICE_NAME} to Cloud Run..."
 
@@ -18,7 +18,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --memory 4Gi \
   --cpu 2 \
   --project ${PROJECT_ID}
- # --project newsjuice-123456 \
+ # --project newsjuice-2 \
  # --account harvardnewsjuice@gmail.com
  # --no-allow-unauthenticated \
  

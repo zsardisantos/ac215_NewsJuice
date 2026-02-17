@@ -5,9 +5,9 @@ import { getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBgsCjTT1B_qZUioacHrLHcs5v0tXcmr2c",
-  authDomain: "newsjuice-123456.firebaseapp.com",
-  projectId: "newsjuice-123456",
-  storageBucket: "newsjuice-123456.firebasestorage.app",
+  authDomain: "newsjuice-2.firebaseapp.com",
+  projectId: "newsjuice-2",
+  storageBucket: "newsjuice-2.firebasestorage.app",
   messagingSenderId: "919568151211",
   appId: "1:919568151211:web:87459d5aabfe4d5ec8fdee"
 };

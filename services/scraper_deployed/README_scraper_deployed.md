@@ -61,7 +61,7 @@ docker compose -f docker-compose.local.yml up
 
 As no service account is specified, Cloud Run will use the default Compute Engine service account for this:
 ```bash
-cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com
+cloud-run-invoker@newsjuice-2.iam.gserviceaccount.com
 ```
 
 Make sure you have the deploy.sh and the env.yaml files.
@@ -119,9 +119,9 @@ Create SA (cloud-run-invoker) - only once (already set up)
 ```bash
 gcloud iam service-accounts create cloud-run-invoker \
   --display-name "Cloud Run Invoker" \
-  --project newsjuice-123456
+  --project newsjuice-2
 ```
-Enable API [cloudscheduler.googleapis.com] on project [newsjuice-123456] (only once, done)
+Enable API [cloudscheduler.googleapis.com] on project [newsjuice-2] (only once, done)
 
 ### ONE TIME SET UP - END
 ---
@@ -137,7 +137,7 @@ Test scheduler manually:
 ```bash
 gcloud scheduler jobs run article-scraper-job \
   --location us-central1 \
-  --project newsjuice-123456
+  --project newsjuice-2
 ```
 
 Change schedule, .e.g.:
@@ -158,10 +158,10 @@ Force a run:
 
 ### EXTRAS
 
-How see what scheduler jobs are on cloud-run-invoker@newsjuice-123456.iam.gserviceaccount.com:
+How see what scheduler jobs are on cloud-run-invoker@newsjuice-2.iam.gserviceaccount.com:
 
 ```bash
 gcloud scheduler jobs list \
   --location=us-central1 \
-  --project=newsjuice-123456
+  --project=newsjuice-2
   ```

@@ -19,7 +19,7 @@ DATA_DIR = PROJECT_ROOT / "data" / "exports"
 SCRIPTS_DIR = PROJECT_ROOT / "scripts" / "data_versioning"
 
 # Database configuration
-# DB_HOST = "/cloudsql/newsjuice-123456:us-central1:newsdb-instance"
+# DB_HOST = "/cloudsql/newsjuice-2:us-central1:newsdb-instance"
 DB_HOST = os.environ.get("PGHOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("PGPORT", "5432"))
 DB_USER = "postgres"
