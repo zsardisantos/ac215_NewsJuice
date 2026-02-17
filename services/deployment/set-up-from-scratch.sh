@@ -108,10 +108,35 @@ fi
 echo ""
 
 # =============================================================================
-# STEP 3: CREATE DEPLOYMENT SERVICE ACCOUNT
+# STEP 3: CREATE PULUMI STATE BUCKET
 # =============================================================================
 
-echo "Step 3: Creating Deployment Service Account"
+echo "Step 3: Creating Pulumi State Bucket"
+echo "----------------------------------------"
+
+PULUMI_BUCKET_NAME="${GCP_PROJECT}-pulumi-state-bucket"
+
+# Check if bucket exists
+if gsutil ls -b gs://$PULUMI_BUCKET_NAME &> /dev/null; then
+    echo "✅ Pulumi state bucket already exists: gs://$PULUMI_BUCKET_NAME"
+else
+    echo "Creating Pulumi state bucket..."
+    gsutil mb -p $GCP_PROJECT -l $GCP_REGION gs://$PULUMI_BUCKET_NAME
+    
+    # Enable versioning for safety (keeps history of state changes)
+    gsutil versioning set on gs://$PULUMI_BUCKET_NAME
+    
+    echo "✅ Created Pulumi state bucket: gs://$PULUMI_BUCKET_NAME"
+    echo "✅ Enabled versioning for state history"
+fi
+
+echo ""
+
+# =============================================================================
+# STEP 4: CREATE DEPLOYMENT SERVICE ACCOUNT
+# =============================================================================
+
+echo "Step 4: Creating Deployment Service Account"
 echo "----------------------------------------"
 
 SERVICE_ACCOUNT_NAME="newsjuice-deployer"
@@ -147,10 +172,10 @@ echo "✅ IAM roles granted"
 echo ""
 
 # =============================================================================
-# STEP 4: CREATE SERVICE ACCOUNT KEY
+# STEP 5: CREATE SERVICE ACCOUNT KEY
 # =============================================================================
 
-echo "Step 4: Creating Service Account Key"
+echo "Step 5: Creating Service Account Key"
 echo "----------------------------------------"
 
 KEY_FILE="${SECRETS_DIR}/deployment.json"
@@ -181,10 +206,10 @@ chmod 600 "$KEY_FILE"
 echo ""
 
 # =============================================================================
-# STEP 5: VERIFY EXISTING RESOURCES
+# STEP 6: VERIFY EXISTING RESOURCES
 # =============================================================================
 
-echo "Step 5: Verifying Existing Resources"
+echo "Step 6: Verifying Existing Resources"
 echo "----------------------------------------"
 
 # Check static IP
@@ -211,9 +236,9 @@ fi
 echo ""
 
 # =============================================================================
-# STEP 6: GEMINI SERVICE ACCOUNT SETUP
+# STEP 7: GEMINI SERVICE ACCOUNT SETUP
 # =============================================================================
-echo "Step 6: Gemini Service Account"
+echo "Step 7: Gemini Service Account"
 echo "----------------------------------------"
 
 GEMINI_SA_NAME="newsjuice-gemini-sa"
@@ -299,10 +324,10 @@ fi
 echo ""
 
 # =============================================================================
-# STEP 7: FIREBASE SETUP
+# STEP 8: FIREBASE SETUP
 # =============================================================================
 
-echo "Step 7: Firebase Authentication Setup"
+echo "Step 8: Firebase Authentication Setup"
 echo "----------------------------------------"
 echo "Firebase is used for user authentication (login/registration)."
 echo "The backend uses Workload Identity - no JSON key file needed."
@@ -347,10 +372,10 @@ echo "✅ Firebase IAM setup complete"
 echo ""
 
 # =============================================================================
-# STEP 8: DNS CONFIGURATION CHECK
+# STEP 9: DNS CONFIGURATION CHECK
 # =============================================================================
 
-echo "Step 8: DNS Configuration Status"
+echo "Step 9: DNS Configuration Status"
 echo "----------------------------------------"
 
 # Check current DNS
@@ -387,6 +412,7 @@ echo ""
 echo "📋 Summary of Setup:"
 echo "  ✅ APIs Enabled (including Firebase + Identity Toolkit)"
 echo "  ✅ Secrets Directory: $SECRETS_DIR"
+echo "  ✅ Pulumi State Bucket: gs://${GCP_PROJECT}-pulumi-state-bucket"
 echo "  ✅ Deployment Service Account: $SERVICE_ACCOUNT_EMAIL"
 echo "  ✅ Deployment Service Account Key: ${SECRETS_DIR}/deployment.json"
 if [ -f "$GEMINI_KEY_FILE" ]; then
@@ -398,7 +424,7 @@ if [ -n "$STATIC_IP" ]; then
     echo "  ✅ Static IP: $STATIC_IP_NAME ($STATIC_IP)"
 fi
 echo "  ✅ Firebase IAM role granted to GKE service account"
-echo "  ⚠️  Firebase Console setup: Manual step required (see Step 7)"
+echo "  ⚠️  Firebase Console setup: Manual step required (see Step 8)"
 echo ""
 
 echo "🔐 Saved Credentials:"
@@ -412,11 +438,11 @@ echo ""
 
 echo "📝 Next Steps:"
 echo ""
-echo "1. Complete Firebase Console setup (Step 7 above):"
+echo "1. Complete Firebase Console setup (Step 8 above):"
 echo "   https://console.firebase.google.com"
 echo ""
 
-echo "2. Verify Gemini Service Account (if not done in Step 6):"
+echo "2. Verify Gemini Service Account (if not done in Step 7):"
 echo "   - Should exist at: $GEMINI_KEY_FILE"
 echo "   - If missing, create manually at: https://console.cloud.google.com/iam-admin/serviceaccounts"
 echo ""
