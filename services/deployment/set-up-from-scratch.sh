@@ -82,6 +82,8 @@ REQUIRED_APIS=(
     "cloudresourcemanager.googleapis.com"   # Resource Manager
     "iam.googleapis.com"                    # IAM
     "aiplatform.googleapis.com"             # Vertex AI (for Gemini)
+    "firebase.googleapis.com"               # Firebase (for Auth)
+    "identitytoolkit.googleapis.com"        # Firebase Identity Toolkit (for token verification)
 )
 
 echo "Enabling APIs (this may take 2-3 minutes)..."
@@ -297,10 +299,58 @@ fi
 echo ""
 
 # =============================================================================
-# STEP 7: DNS CONFIGURATION CHECK
+# STEP 7: FIREBASE SETUP
 # =============================================================================
 
-echo "Step 7: DNS Configuration Status"
+echo "Step 7: Firebase Authentication Setup"
+echo "----------------------------------------"
+echo "Firebase is used for user authentication (login/registration)."
+echo "The backend uses Workload Identity - no JSON key file needed."
+echo ""
+
+# The GKE service account that needs Firebase permissions
+GKE_SA_EMAIL="newsjuice-services-sa@${GCP_PROJECT}.iam.gserviceaccount.com"
+
+echo "Granting Firebase Admin role to GKE service account..."
+echo "(This allows the chatter service to verify Firebase tokens)"
+echo ""
+
+# Grant Firebase SDK Admin role to the GKE workload service account
+# This is needed for firebase_admin.initialize_app() to work with ADC
+gcloud projects add-iam-policy-binding $GCP_PROJECT \
+    --member="serviceAccount:${GKE_SA_EMAIL}" \
+    --role="roles/firebase.sdkAdminServiceAgent" \
+    --condition=None \
+    --quiet
+
+echo "✅ Granted roles/firebase.sdkAdminServiceAgent to $GKE_SA_EMAIL"
+echo ""
+
+# Remind user about Firebase console setup (can't be automated via gcloud)
+echo "⚠️  MANUAL STEP REQUIRED - Firebase Console Setup:"
+echo "   The following must be done manually in the Firebase Console:"
+echo ""
+echo "   1. Go to: https://console.firebase.google.com"
+echo "   2. Click 'Add project'"
+echo "   3. Select 'Add Firebase to existing Google Cloud project'"
+echo "   4. Select project: $GCP_PROJECT"
+echo "   5. Go to Authentication → Get Started"
+echo "   6. Enable 'Email/Password' sign-in method"
+echo "   7. Go to Project Settings → Your apps"
+echo "   8. Add a Web app and copy the firebaseConfig"
+echo "   9. Paste the config into your frontend firebase.js file"
+echo ""
+echo "   If Firebase project is already set up, skip steps 1-4."
+echo ""
+
+echo "✅ Firebase IAM setup complete"
+echo ""
+
+# =============================================================================
+# STEP 8: DNS CONFIGURATION CHECK
+# =============================================================================
+
+echo "Step 8: DNS Configuration Status"
 echo "----------------------------------------"
 
 # Check current DNS
@@ -335,7 +385,7 @@ echo "Setup Complete!"
 echo "=============================================="
 echo ""
 echo "📋 Summary of Setup:"
-echo "  ✅ APIs Enabled"
+echo "  ✅ APIs Enabled (including Firebase + Identity Toolkit)"
 echo "  ✅ Secrets Directory: $SECRETS_DIR"
 echo "  ✅ Deployment Service Account: $SERVICE_ACCOUNT_EMAIL"
 echo "  ✅ Deployment Service Account Key: ${SECRETS_DIR}/deployment.json"
@@ -347,6 +397,8 @@ fi
 if [ -n "$STATIC_IP" ]; then
     echo "  ✅ Static IP: $STATIC_IP_NAME ($STATIC_IP)"
 fi
+echo "  ✅ Firebase IAM role granted to GKE service account"
+echo "  ⚠️  Firebase Console setup: Manual step required (see Step 7)"
 echo ""
 
 echo "🔐 Saved Credentials:"
@@ -360,22 +412,26 @@ echo ""
 
 echo "📝 Next Steps:"
 echo ""
-echo "1. Verify Gemini Service Account (if not done in Step 6):"
+echo "1. Complete Firebase Console setup (Step 7 above):"
+echo "   https://console.firebase.google.com"
+echo ""
+
+echo "2. Verify Gemini Service Account (if not done in Step 6):"
 echo "   - Should exist at: $GEMINI_KEY_FILE"
 echo "   - If missing, create manually at: https://console.cloud.google.com/iam-admin/serviceaccounts"
 echo ""
 
-echo "2. Get database password:"
+echo "3. Get database password:"
 echo "   - You should have this from your existing database instance"
 echo "   - You'll need it for Pulumi config in step 4"
 echo ""
 
-echo "3. Update your code files (if needed):"
+echo "4. Update your code files (if needed):"
 echo "   - docker-shell.sh: Verify GCP_PROJECT='newsjuice-2'"
 echo "   - __main__.py: Verify correct bucket names and remove any hardcoded API keys"
 echo ""
 
-echo "4. Configure Pulumi:"
+echo "5. Configure Pulumi:"
 echo "   cd deployment"
 echo "   pulumi stack init newsjuice-prod  # if stack doesn't exist"
 echo "   pulumi config set gcp:project newsjuice-2"
@@ -386,22 +442,22 @@ echo "   pulumi config set enable_cloudrun false"
 echo "   pulumi config set --secret db_password YOUR_DB_PASSWORD"
 echo ""
 
-echo "5. Set environment variable for deployment:"
+echo "6. Set environment variable for deployment:"
 echo "   export GOOGLE_APPLICATION_CREDENTIALS=${SECRETS_DIR}/deployment.json"
 echo ""
 
-echo "6. Deploy with Pulumi:"
+echo "7. Deploy with Pulumi:"
 echo "   ./docker-shell.sh"
 echo "   # Inside container:"
 echo "   pulumi up"
 echo ""
 
-echo "7. After deployment, wait ~15 minutes for SSL certificate provisioning:"
+echo "8. After deployment, wait ~15 minutes for SSL certificate provisioning:"
 echo "   kubectl describe managedcertificate newsjuice-cert -n newsjuice"
 echo "   # Look for 'Status: Active'"
 echo ""
 
-echo "8. Verify deployment:"
+echo "9. Verify deployment:"
 echo "   curl https://www.newsjuiceapp.com"
 echo ""
 

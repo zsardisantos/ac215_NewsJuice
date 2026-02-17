@@ -20,7 +20,7 @@ def upload_audio_to_gcs(audio_bytes: bytes, user_id: str, filename_prefix: str =
         Public URL to the uploaded file, or None if upload fails
     """
     try:
-        bucket_name = os.environ.get("AUDIO_BUCKET", "newsjuice-123456-audio-bucket")
+        bucket_name = os.environ.get("AUDIO_BUCKET", "newsjuice-2-audio-bucket")
         gcs_prefix = os.environ.get("GCS_PREFIX", "podcasts/")
         cache_control = os.environ.get("CACHE_CONTROL", "public, max-age=3600")
 

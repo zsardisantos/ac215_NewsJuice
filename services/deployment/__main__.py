@@ -725,12 +725,18 @@ if enable_gke:
                                         # CM: Waits for cloud-sql-proxy, then calls /process
                                         # CM: IMPORTANT: Adjust this if your service starts
                                         # CM: processing automatically on container start
+                                        #command=[
+                                        #    "/bin/sh",
+                                        #     "-c",
+                                        #    "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -X POST http://localhost:8080/process && wait"
+                                        #],
+
+                                        # CHANGED TO (Option A - use sync endpoint):
                                         command=[
-                                            "/bin/sh",
-                                            "-c",
-                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -X POST http://localhost:8080/process && wait"
-                                        ],
-                                        
+                                            "/bin/sh", "-c",
+                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $(lsof -t -i:8080)"
+                                        ]
+
                                         env=[
                                             k8s.core.v1.EnvVarArgs(name="DB_HOST", value="127.0.0.1"),
                                             k8s.core.v1.EnvVarArgs(name="DB_NAME", value=db_name),
