@@ -24,9 +24,9 @@ region = gcp_config.get("region") or "us-central1"
 zone = gcp_config.get("zone") or "us-central1-a"
 
 # Database configuration
-db_instance_name = config.get("db_instance_name") or "newsjuice-db-instance"
-db_name = config.get("db_name") or "newsjuice"
-db_user = config.get("db_user") or "newsjuice_app"
+db_instance_name = config.get("db_instance_name") or "newsdb-instance"
+db_name = config.get("db_name") or "newsdb"
+db_user = config.get("db_user") or "postgres"
 db_password = config.require_secret("db_password")
 
 # Deployment options
@@ -57,7 +57,7 @@ SERVICES = [
         "source_dir": "/chatter_deployed",
         "extra_envs": [
             ("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://34.28.40.119,https://www.newsjuiceapp.com,https://newsjuiceapp.com"),
-            ("AUDIO_BUCKET", "newsjuice-3-audio-bucket"),
+            ("AUDIO_BUCKET", f"{project}-audio-bucket"),
             ("GCS_PREFIX", "podcasts/"),
         ],
     },
