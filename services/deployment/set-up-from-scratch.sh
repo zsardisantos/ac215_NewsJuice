@@ -342,13 +342,24 @@ echo ""
 
 # Grant Firebase SDK Admin role to the GKE workload service account
 # This is needed for firebase_admin.initialize_app() to work with ADC
-gcloud projects add-iam-policy-binding $GCP_PROJECT \
-    --member="serviceAccount:${GKE_SA_EMAIL}" \
-    --role="roles/firebase.sdkAdminServiceAgent" \
-    --condition=None \
-    --quiet
-
-echo "✅ Granted roles/firebase.sdkAdminServiceAgent to $GKE_SA_EMAIL"
+# NOTE: This service account is created by Pulumi, so it might not exist yet
+if gcloud iam service-accounts describe $GKE_SA_EMAIL --project=$GCP_PROJECT &> /dev/null; then
+    gcloud projects add-iam-policy-binding $GCP_PROJECT \
+        --member="serviceAccount:${GKE_SA_EMAIL}" \
+        --role="roles/firebase.sdkAdminServiceAgent" \
+        --condition=None \
+        --quiet
+    echo "✅ Granted roles/firebase.sdkAdminServiceAgent to $GKE_SA_EMAIL"
+else
+    echo "⚠️  Service account $GKE_SA_EMAIL does not exist yet"
+    echo "   This is normal - it will be created by Pulumi deployment"
+    echo "   After running 'pulumi up', run this command manually:"
+    echo ""
+    echo "   gcloud projects add-iam-policy-binding $GCP_PROJECT \\"
+    echo "       --member=\"serviceAccount:${GKE_SA_EMAIL}\" \\"
+    echo "       --role=\"roles/firebase.sdkAdminServiceAgent\""
+    echo ""
+fi
 echo ""
 
 # Remind user about Firebase console setup (can't be automated via gcloud)

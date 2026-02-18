@@ -1,0 +1,9 @@
+encryptionsalt: v1:dQMdTIMmWC4=:v1:vZETNlvTcb1V/XB6:ES35Z/kTKyqVpc63VYp5sHxhs50asA==
+config:
+  gcp:project: newsjuice-2
+  gcp:region: us-central1
+  gcp:zone: us-central1-a
+  newsjuice-infrastructure:enable_gke: "true"
+  newsjuice-infrastructure:enable_cloudrun: "false"
+  newsjuice-infrastructure:db_password:
+    secure: v1:qZ56QCqHOpnqwEhJ:CvPzqt2kFq9kapxBXb1p9a6/dFQVL8+dxqrbGQ4ZeQ==

@@ -30,8 +30,8 @@ db_user = config.get("db_user") or "newsjuice_app"
 db_password = config.require_secret("db_password")
 
 # Deployment options
-enable_cloudrun = config.get_bool("enable_cloudrun") or True
-enable_gke = config.get_bool("enable_gke") or False
+enable_cloudrun = config.get_bool("enable_cloudrun") or False
+enable_gke = config.get_bool("enable_gke") or True
 gke_node_count = config.get_int("gke_node_count") or 2
 gke_machine_type = config.get("gke_machine_type") or "e2-standard-2"
 
@@ -150,6 +150,13 @@ vertex_user_binding = gcp.projects.IAMMember(
     "vertex-user",
     project=project,
     role="roles/aiplatform.user",
+    member=service_account.email.apply(lambda email: f"serviceAccount:{email}"),
+)
+
+firebase_admin_binding = gcp.projects.IAMMember(
+    "firebase-admin",
+    project=project,
+    role="roles/firebase.sdkAdminServiceAgent",
     member=service_account.email.apply(lambda email: f"serviceAccount:{email}"),
 )
 
