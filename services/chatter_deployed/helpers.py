@@ -209,8 +209,11 @@ changes. For information on this topic, you may want to check the Harvard Gazett
 
 Now generate your response:"""
 
+        
         response = model.generate_content(prompt)
         return response.text, None
+
+
     except Exception as e:
         return None, str(e)
 

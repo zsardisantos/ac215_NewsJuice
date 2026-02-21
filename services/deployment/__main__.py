@@ -739,9 +739,14 @@ if enable_gke:
                                         #],
 
                                         # CHANGED TO (Option A - use sync endpoint):
+                                        #command=[
+                                        #    "/bin/sh", "-c",
+                                        #     "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $(lsof -t -i:8080)"
+                                        #],
+
                                         command=[
                                             "/bin/sh", "-c",
-                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $(lsof -t -i:8080)"
+                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & PID=$! && sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $PID"
                                         ],
 
                                         env=[
