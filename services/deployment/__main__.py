@@ -744,10 +744,19 @@ if enable_gke:
                                         #     "uvicorn main:app --host 0.0.0.0 --port 8080 & sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $(lsof -t -i:8080)"
                                         #],
 
+                                        #command=[
+                                        #    "/bin/sh", "-c",
+                                        #     "uvicorn main:app --host 0.0.0.0 --port 8080 & PID=$! && sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $PID"
+                                        #],
+
+
                                         command=[
                                             "/bin/sh", "-c",
-                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & PID=$! && sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $PID"
+                                            "uvicorn main:app --host 0.0.0.0 --port 8080 & PID=$! && sleep 15 && curl -f -X POST http://localhost:8080/process-sync && kill $PID && sleep 5 && exit 0"
                                         ],
+
+
+
 
                                         env=[
                                             k8s.core.v1.EnvVarArgs(name="DB_HOST", value="127.0.0.1"),
