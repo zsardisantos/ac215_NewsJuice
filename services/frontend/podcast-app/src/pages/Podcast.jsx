@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 // Removed orb components
 import { useVAD } from '../hooks/useVAD'
 
+// Hands-free (voice activity detection) mode is unreliable right now, so it is
+// switched off and its toggle hidden. Set to true to bring both back.
+const HANDS_FREE_ENABLED = false
+
 function Podcast() {
   const navigate = useNavigate()
 
@@ -28,7 +32,7 @@ function Podcast() {
   }
   const [statusMessage, setStatusMessage] = useState(() => {
     const saved = localStorage.getItem('vad_enabled')
-    const isVadEnabled = saved === 'true'
+    const isVadEnabled = HANDS_FREE_ENABLED && saved === 'true'
     return isVadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question"
   })
   const [menuOpen, setMenuOpen] = useState(false)
@@ -46,6 +50,16 @@ function Podcast() {
   const currentAudioUrlRef = useRef(null)
   const preventAutoPlayRef = useRef(false)
 
+  // Web Audio API refs for streaming Q&A playback
+  const qaAudioCtxRef = useRef(null)
+  const qaNextStartTimeRef = useRef(0)
+  const segmentChunksRef = useRef([])
+  const qaEndTimeoutRef = useRef(null)
+  // Segments are decoded asynchronously. Chaining them on one promise schedules them
+  // in arrival order and lets "complete" wait until the LAST one is scheduled before
+  // computing when the answer ends (otherwise the brief resumed under the last line).
+  const qaScheduleChainRef = useRef(Promise.resolve())
+
   // ========== UNIFIED AUDIO STATE (Phase 1) ==========
   const [audioMode, setAudioMode] = useState('IDLE')  // IDLE, PLAYING_BRIEF, PAUSED_FOR_QA, PLAYING_QA, RESUMING_BRIEF
   const savedBriefPosition = useRef(0)  // Saves playback position when pausing for Q&A
@@ -56,7 +70,7 @@ function Podcast() {
   // Load VAD preference from localStorage (defaults to false if not set)
   const [vadEnabled, setVadEnabled] = useState(() => {
     const saved = localStorage.getItem('vad_enabled')
-    return saved === 'true' // Convert string to boolean
+    return HANDS_FREE_ENABLED && saved === 'true' // Convert string to boolean
   })
   const [micPermissionGranted, setMicPermissionGranted] = useState(false) // Track if mic permission granted (for iOS)
 
@@ -93,6 +107,26 @@ function Podcast() {
       setStatusMessage(vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
     }
   }, [vadEnabled])
+
+  // Silence a streaming Q&A answer. Answers play as Web Audio segments scheduled on
+  // qaAudioCtxRef, not through audioPlayerRef (the old <audio> player), so pausing
+  // audioPlayerRef alone left the answer playing. Closing the context stops every
+  // scheduled segment at once, and segments still arriving for this answer are
+  // dropped because audio_segment_done skips a closed context. The next answer
+  // opens a fresh context on "streaming_audio".
+  const silenceStreamingAnswer = () => {
+    if (qaAudioCtxRef.current && qaAudioCtxRef.current.state !== 'closed') {
+      qaAudioCtxRef.current.close()
+    }
+    segmentChunksRef.current = []
+    qaNextStartTimeRef.current = 0
+    isStreamingAudioRef.current = false
+    qaScheduleChainRef.current = Promise.resolve()
+    if (qaEndTimeoutRef.current) {
+      clearTimeout(qaEndTimeoutRef.current)
+      qaEndTimeoutRef.current = null
+    }
+  }
 
   // Handle voice interruption when VAD detects speech
   const handleVoiceInterruption = () => {
@@ -151,6 +185,7 @@ function Podcast() {
       console.log('[vad] Interruption mode activated - protecting VAD state')
 
       // Stop current Q&A playback
+      silenceStreamingAnswer()
       if (audioPlayerRef.current) {
         audioPlayerRef.current.pause()
         audioPlayerRef.current.currentTime = 0
@@ -532,7 +567,8 @@ function Podcast() {
         }
       }
 
-      // Play the brief
+      // Play the brief (and make sure no Q&A answer is still sounding)
+      silenceStreamingAnswer()
       briefAudioRef.current.play()
       setBriefAudioPlaying(true)
       setAudioMode('PLAYING_BRIEF')
@@ -719,13 +755,110 @@ function Podcast() {
         break
       case "streaming_audio":
         setStatusMessage("📡 Receiving audio stream...")
-        audioBufferRef.current = []
+        segmentChunksRef.current = []
         isStreamingAudioRef.current = false
+        qaNextStartTimeRef.current = 0
+        if (qaEndTimeoutRef.current) {
+          clearTimeout(qaEndTimeoutRef.current)
+          qaEndTimeoutRef.current = null
+        }
+        // Close previous context and create a fresh one (stops any leftover audio)
+        if (qaAudioCtxRef.current && qaAudioCtxRef.current.state !== 'closed') {
+          qaAudioCtxRef.current.close()
+        }
+        qaAudioCtxRef.current = new AudioContext()
+        qaScheduleChainRef.current = Promise.resolve()
         break
-      case "complete":
-        setStatusMessage("✅ Complete! Playing podcast...")
-        finalizeAudio()
+      case "audio_segment_done":
+        if (isRecordingRef.current || preventAutoPlayRef.current ||
+            (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF')) {
+          segmentChunksRef.current = []
+          break
+        }
+        {
+        const chunks = [...segmentChunksRef.current]
+        segmentChunksRef.current = []
+        // The context this segment belongs to. If the answer is stopped or replaced
+        // before the segment is decoded, it no longer matches and the segment is dropped.
+        const segCtx = qaAudioCtxRef.current
+        qaScheduleChainRef.current = qaScheduleChainRef.current.then(async () => {
+          if (chunks.length === 0) return
+          try {
+            const blob = new Blob(chunks, { type: 'audio/wav' })
+            const arrayBuffer = await blob.arrayBuffer()
+            const audioCtx = qaAudioCtxRef.current
+            if (!audioCtx || audioCtx !== segCtx || audioCtx.state === 'closed') return
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+            // Stop may have been pressed while this segment was decoding
+            if (audioCtx !== qaAudioCtxRef.current || audioCtx.state === 'closed') return
+            const source = audioCtx.createBufferSource()
+            source.buffer = audioBuffer
+            source.connect(audioCtx.destination)
+            const isFirst = qaNextStartTimeRef.current === 0
+            const startAt = isFirst
+              ? audioCtx.currentTime + 0.05
+              : Math.max(audioCtx.currentTime + 0.05, qaNextStartTimeRef.current)
+            source.start(startAt)
+            qaNextStartTimeRef.current = startAt + audioBuffer.duration
+            console.log(`[audio] Segment scheduled: ${audioBuffer.duration.toFixed(2)}s at t=${startAt.toFixed(2)}`)
+            if (isFirst) {
+              setIsPlaying(true)
+              setAudioMode('PLAYING_QA')
+              if (vadEnabled && vad && !vad.loading && !vad.errored) {
+                vad.start()
+                setStatusMessage("🎤 Playing answer... (Speak to ask a follow-up question)")
+              } else {
+                setStatusMessage("🔊 Playing answer...")
+              }
+            }
+          } catch (e) {
+            console.error('[audio] Failed to decode segment:', e)
+          }
+        })
+        }
         break
+      case "complete": {
+        // "complete" means the backend finished SENDING; the answer is usually still
+        // playing, and the timeout below resets the status when playback really ends.
+        // Wait for the queue so the last segment is included in the end time.
+        const completeCtx = qaAudioCtxRef.current
+        qaScheduleChainRef.current.then(() => {
+        if (qaAudioCtxRef.current !== completeCtx) return  // stopped or replaced meanwhile
+        if (qaAudioCtxRef.current && qaNextStartTimeRef.current > 0) {
+          setStatusMessage("🔊 Playing answer...")
+          const remaining = (qaNextStartTimeRef.current - qaAudioCtxRef.current.currentTime) * 1000
+          qaEndTimeoutRef.current = setTimeout(() => {
+            setIsPlaying(false)
+            setStatusMessage(vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
+            if (shouldAutoResume.current && briefAudioRef.current && !inFollowUpMode.current) {
+              console.log("[auto-resume] Q&A finished, resuming daily brief")
+              setAudioMode('RESUMING_BRIEF')
+              setTimeout(() => {
+                silenceStreamingAnswer()  // guarantee no Q&A audio under the brief
+                briefAudioRef.current.currentTime = savedBriefPosition.current
+                briefAudioRef.current.play()
+                setBriefAudioPlaying(true)
+                setAudioMode('PLAYING_BRIEF')
+                shouldAutoResume.current = false
+                console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
+                if (vadEnabled && vad && !vad.loading && !vad.errored) {
+                  vad.start()
+                  console.log('[vad] Restarted - brief resumed, listening for voice again')
+                }
+              }, 500)
+            } else if (inFollowUpMode.current) {
+              console.log("[follow-up] Q&A finished but in follow-up mode - brief stays paused")
+              setStatusMessage("Ask another question or return to daily brief")
+            }
+          }, Math.max(0, remaining) + 250)  // small margin past the last sample
+        } else {
+          // Nothing left to play (answer was stopped, or no audio came back)
+          setIsPlaying(false)
+          setStatusMessage(getDefaultStatusMessage())
+        }
+        })
+        break
+      }
       case "error":
         setStatusMessage(`❌ Error: ${data.error}`)
         setIsRecording(false)
@@ -748,120 +881,8 @@ function Podcast() {
       isStreamingAudioRef.current = true
     }
 
-    audioBufferRef.current.push(chunk)
-    console.log(`[audio] Accumulated ${audioBufferRef.current.length} chunks (${chunk.size} bytes)`)
-  }
-
-  // Finalize and play audio
-  const finalizeAudio = () => {
-    if (isRecordingRef.current || preventAutoPlayRef.current) {
-      console.log("[audio] Skipping audio playback - recording in progress or auto-play prevented")
-      audioBufferRef.current = []
-      isStreamingAudioRef.current = false
-      return
-    }
-
-    // Don't play Q&A audio if daily brief is currently playing (user returned to brief)
-    if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
-      console.log("[audio] Skipping Q&A audio playback - daily brief is playing")
-      audioBufferRef.current = []
-      isStreamingAudioRef.current = false
-      return
-    }
-
-    if (audioBufferRef.current.length === 0) {
-      console.warn("[audio] No audio chunks to finalize")
-      return
-    }
-
-    console.log(`[audio] Finalizing audio: ${audioBufferRef.current.length} chunks`)
-
-    if (currentAudioUrlRef.current) {
-      console.log("[audio] Revoking previous audio URL")
-      URL.revokeObjectURL(currentAudioUrlRef.current)
-      currentAudioUrlRef.current = null
-    }
-
-    const mimeTypes = ['audio/wav', 'audio/wave', 'audio/x-wav']
-
-    for (const mimeType of mimeTypes) {
-      try {
-        const audioBlob = new Blob(audioBufferRef.current, { type: mimeType })
-        const audioUrl = URL.createObjectURL(audioBlob)
-
-        currentAudioUrlRef.current = audioUrl
-
-        if (!audioPlayerRef.current) {
-          audioPlayerRef.current = new Audio()
-        }
-
-        audioPlayerRef.current.src = audioUrl
-        audioPlayerRef.current.oncanplay = () => {
-          if (isRecordingRef.current || preventAutoPlayRef.current) {
-            console.log("[audio] oncanplay - Skipping playback, recording active")
-            return
-          }
-          // Final safety check: don't play Q&A if daily brief is playing
-          if (briefAudioPlayingRef.current && audioModeRef.current === 'PLAYING_BRIEF') {
-            console.log("[audio] oncanplay - Skipping Q&A playback, daily brief is playing")
-            return
-          }
-          console.log("[audio] Audio can play, attempting autoplay")
-          setIsPlaying(true)
-          setAudioMode('PLAYING_QA')  // [Phase 1] Set mode to PLAYING_QA
-          audioPlayerRef.current.play().catch((err) => {
-            console.warn("[audio] Autoplay blocked:", err)
-          })
-
-          // [Phase 2] Restart VAD during Q&A playback so user can ask follow-up questions
-          if (vadEnabled && vad && !vad.loading && !vad.errored) {
-            vad.start()
-            console.log('[vad] Restarted during Q&A playback - user can ask follow-ups')
-            setStatusMessage("🎤 Playing answer... (Speak to ask a follow-up question)")
-          }
-        }
-
-        audioPlayerRef.current.onended = () => {
-          setIsPlaying(false)
-          setStatusMessage(vadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question")
-
-          // [Phase 1] AUTO-RESUME DAILY BRIEF AFTER Q&A
-          // Don't auto-resume if user is in follow-up mode (asking multiple questions)
-          if (shouldAutoResume.current && briefAudioRef.current && !inFollowUpMode.current) {
-            console.log("[auto-resume] Q&A finished, resuming daily brief")
-            setAudioMode('RESUMING_BRIEF')
-            setTimeout(() => {
-              briefAudioRef.current.currentTime = savedBriefPosition.current
-              briefAudioRef.current.play()
-              setBriefAudioPlaying(true)
-              setAudioMode('PLAYING_BRIEF')
-              shouldAutoResume.current = false
-              console.log(`[auto-resume] Resumed daily brief at ${savedBriefPosition.current}s`)
-
-              // [Phase 2] Restart VAD when brief resumes (if VAD is enabled)
-              if (vadEnabled && vad && !vad.loading && !vad.errored) {
-                vad.start()
-                console.log('[vad] Restarted - brief resumed, listening for voice again')
-              }
-            }, 500)  // Small delay for smooth transition
-          } else if (inFollowUpMode.current) {
-            console.log("[follow-up] Q&A finished but in follow-up mode - brief stays paused")
-            setStatusMessage("Ask another question or return to daily brief")
-          }
-        }
-
-        audioPlayerRef.current.onerror = (e) => {
-          console.error(`[audio] Error playing audio with ${mimeType}:`, e)
-        }
-
-        break
-      } catch (e) {
-        console.warn(`[audio] Failed to create blob with ${mimeType}:`, e)
-      }
-    }
-
-    audioBufferRef.current = []
-    isStreamingAudioRef.current = false
+    segmentChunksRef.current.push(chunk)
+    console.log(`[audio] Accumulated ${segmentChunksRef.current.length} chunks for current segment (${chunk.size} bytes)`)
   }
 
   // Start recording
@@ -876,6 +897,12 @@ function Podcast() {
       audioLevelRef.current = 0
       audioChunksSentRef.current = 0
       console.log("[recording] preventAutoPlay flag set to TRUE, audio tracking initialized")
+
+      // Cancel any pending post-playback logic (user interrupted Q&A)
+      if (qaEndTimeoutRef.current) {
+        clearTimeout(qaEndTimeoutRef.current)
+        qaEndTimeoutRef.current = null
+      }
 
       // [Phase 1] AUTO-PAUSE DAILY BRIEF FOR Q&A (using ref to avoid stale closure)
       if (briefAudioRef.current && briefAudioPlayingRef.current) {
@@ -1145,6 +1172,8 @@ function Podcast() {
   const stopQAPlaybackOnly = () => {
     console.log("[playback] Stopping Q&A playback without auto-resume")
 
+    silenceStreamingAnswer()
+
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause()
       audioPlayerRef.current.currentTime = 0
@@ -1201,6 +1230,7 @@ function Podcast() {
     console.log("[return-to-brief] User manually returning to daily brief")
 
     // Fully stop Q&A audio (complete cleanup)
+    silenceStreamingAnswer()
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause()
       audioPlayerRef.current.currentTime = 0
@@ -1631,6 +1661,7 @@ function Podcast() {
               </motion.button>
 
               {/* Voice Detection Toggle Switch */}
+              {HANDS_FREE_ENABLED && (
               <div className="flex flex-col items-center gap-2">
                 <div className="relative inline-flex items-center">
                   {/* Label - Hands-free (left side) */}
@@ -1665,6 +1696,7 @@ function Podcast() {
                   </span>
                 </div>
               </div>
+              )}
 
               {/* Stop Q&A Answer Button (shows when Q&A audio is playing) */}
               <AnimatePresence>

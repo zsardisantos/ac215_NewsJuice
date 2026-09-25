@@ -1,0 +1,29 @@
+# Local Postgres + pgvector for the NewsJuice demo.
+# Replaces Cloud SQL entirely -- no cloud-sql-proxy, no service account needed for the DB.
+#
+#   docker compose -f demo-local/docker-compose.yml up -d
+#
+# Schema is applied automatically from schema.sql on first boot.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: newsjuice-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: newsjuice
+      POSTGRES_DB: newsdb
+    ports:
+      - "5433:5432" # 5433 on the host to avoid clashing with any local Postgres
+    volumes:
+      - newsjuice_pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d newsdb"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  newsjuice_pgdata:

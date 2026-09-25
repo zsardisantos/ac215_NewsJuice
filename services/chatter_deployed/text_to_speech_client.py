@@ -19,6 +19,7 @@ def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sa
 
 import struct
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List
 from google.cloud import texttospeech
 
@@ -99,6 +100,72 @@ async def text_to_audio_stream(text: str, websocket, voice_name: Optional[str] =
 
         traceback.print_exc()
         return None
+
+async def synthesize_and_stream_segments(token_stream, voice_name, websocket):
+    """
+    Consumes a (sync) Gemini token stream, accumulates into segments at sentence
+    boundaries (≥200 chars), synthesizes each segment via TTS, and streams WAV
+    bytes + a JSON 'audio_segment_done' signal per segment to the WebSocket.
+    """
+    import asyncio
+
+    client = texttospeech.TextToSpeechClient()
+    default_voice = "en-US-Chirp3-HD-Aoede"
+    selected_voice = voice_name if voice_name else default_voice
+
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="en-US",
+        name=selected_voice,
+    )
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+        sample_rate_hertz=24000,
+        speaking_rate=1.0,
+        pitch=0.0,
+    )
+
+    buffer = ""
+
+    async def flush_segment(text):
+        text = text.strip()
+        if not text:
+            return
+        print(f"[stream-tts] Synthesizing segment ({len(text)} chars): {text[:60]}...")
+        pcm = await asyncio.get_event_loop().run_in_executor(
+            None, _synthesize_chunk, client, text, voice, audio_config
+        )
+        if pcm:
+            wav = _pcm_to_wav(pcm, sample_rate=24000)
+            await websocket.send_bytes(wav)
+            await websocket.send_json({"status": "audio_segment_done"})
+
+    first_segment = True
+
+    async for token in token_stream:          # sync generator from Gemini
+        buffer += token
+        # The first segment is spoken as soon as ONE sentence is complete, so the
+        # listener hears something fast. Later segments batch >=200 chars at a
+        # sentence boundary, which sounds smoother and costs fewer TTS calls.
+        if first_segment:
+            m = next((m for m in re.finditer(r'[.!?]\s', buffer) if m.end() >= 40), None)
+            if m:
+                segment, buffer = buffer[:m.end()], buffer[m.end():]
+                await flush_segment(segment)
+                first_segment = False
+            continue
+        if len(buffer) >= 200 and re.search(r'[.!?]\s', buffer):
+            # Split at the last sentence boundary
+            match = None
+            for m in re.finditer(r'[.!?]\s', buffer):
+                match = m
+            if match:
+                segment = buffer[:match.end()]
+                buffer = buffer[match.end():]
+                await flush_segment(segment)
+
+    # Flush any remaining text
+    await flush_segment(buffer)
+
 
 
 def _pcm_to_wav(
@@ -274,42 +341,24 @@ def text_to_audio_bytes(text: str, voice_name: Optional[str] = None) -> Optional
             pitch=0.0,  # Normal pitch
         )
 
-        # Check if text needs to be chunked (5000 byte limit, use 4000 to be safe)
-        chunks = _split_text_into_chunks(text, max_bytes=4000)
+        # Split into small sentence-aligned pieces and synthesize them in parallel.
+        # Synthesis time grows with text length (~38s for 4000 chars with Chirp3-HD),
+        # so N pieces at once finish in roughly the time of the longest piece instead
+        # of the sum of all of them. The TTS client is thread-safe.
+        chunks = _split_text_into_chunks(text, max_bytes=800)
+        print(f"[cloud-tts] Synthesizing {len(chunks)} piece(s) in parallel...")
 
-        if len(chunks) == 1:
-            # Single chunk - use simple path
-            print("[cloud-tts] Sending text to Google Cloud Text-to-Speech API...")
-            synthesis_input = texttospeech.SynthesisInput(text=text)
-            response = client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-            pcm_data = response.audio_content
-            print(f"[cloud-tts] Received audio data: {len(pcm_data)} bytes")
-        else:
-            # Multiple chunks - synthesize each and concatenate with pauses
-            print(f"[cloud-tts] Synthesizing {len(chunks)} chunks...")
-            pcm_chunks = []
-            pause_duration = 0.8  # Pause duration in seconds between chunks
+        with ThreadPoolExecutor(max_workers=min(8, len(chunks))) as pool:
+            pcm_pieces = list(pool.map(lambda c: _synthesize_chunk(client, c, voice, audio_config), chunks))
 
-            for i, chunk in enumerate(chunks, 1):
-                print(f"[cloud-tts] Synthesizing chunk {i}/{len(chunks)} ({len(chunk.encode('utf-8'))} bytes)...")
-                chunk_pcm = _synthesize_chunk(client, chunk, voice, audio_config)
+        if any(p is None for p in pcm_pieces):
+            print("[cloud-tts-error] At least one piece failed to synthesize")
+            return None
 
-                if not chunk_pcm:
-                    print(f"[cloud-tts-error] Failed to synthesize chunk {i}")
-                    return None
-
-                pcm_chunks.append(chunk_pcm)
-                print(f"[cloud-tts] Chunk {i} synthesized: {len(chunk_pcm)} bytes")
-
-                # Add pause after each chunk (except the last one)
-                if i < len(chunks):
-                    silence = _generate_silence(duration_seconds=pause_duration, sample_rate=24000)
-                    pcm_chunks.append(silence)
-                    print(f"[cloud-tts] Added {pause_duration}s pause after chunk {i}")
-
-            # Concatenate all PCM chunks (including pauses)
-            pcm_data = b"".join(pcm_chunks)
-            print(f"[cloud-tts] Concatenated {len(chunks)} chunks with pauses: {len(pcm_data)} total bytes")
+        # Short gap between pieces so sentence boundaries sound natural.
+        gap = _generate_silence(duration_seconds=0.25, sample_rate=24000)
+        pcm_data = gap.join(pcm_pieces)
+        print(f"[cloud-tts] Joined {len(chunks)} piece(s): {len(pcm_data)} total bytes")
 
         # Convert PCM to WAV format
         print("[cloud-tts] Converting PCM to WAV format...")
