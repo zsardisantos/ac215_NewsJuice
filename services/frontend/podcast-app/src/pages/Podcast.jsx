@@ -55,6 +55,10 @@ function Podcast() {
   const qaNextStartTimeRef = useRef(0)
   const segmentChunksRef = useRef([])
   const qaEndTimeoutRef = useRef(null)
+  // Segments are decoded asynchronously. Chaining them on one promise schedules them
+  // in arrival order and lets "complete" wait until the LAST one is scheduled before
+  // computing when the answer ends (otherwise the brief resumed under the last line).
+  const qaScheduleChainRef = useRef(Promise.resolve())
 
   // ========== UNIFIED AUDIO STATE (Phase 1) ==========
   const [audioMode, setAudioMode] = useState('IDLE')  // IDLE, PLAYING_BRIEF, PAUSED_FOR_QA, PLAYING_QA, RESUMING_BRIEF
@@ -117,6 +121,7 @@ function Podcast() {
     segmentChunksRef.current = []
     qaNextStartTimeRef.current = 0
     isStreamingAudioRef.current = false
+    qaScheduleChainRef.current = Promise.resolve()
     if (qaEndTimeoutRef.current) {
       clearTimeout(qaEndTimeoutRef.current)
       qaEndTimeoutRef.current = null
@@ -562,7 +567,8 @@ function Podcast() {
         }
       }
 
-      // Play the brief
+      // Play the brief (and make sure no Q&A answer is still sounding)
+      silenceStreamingAnswer()
       briefAudioRef.current.play()
       setBriefAudioPlaying(true)
       setAudioMode('PLAYING_BRIEF')
@@ -761,6 +767,7 @@ function Podcast() {
           qaAudioCtxRef.current.close()
         }
         qaAudioCtxRef.current = new AudioContext()
+        qaScheduleChainRef.current = Promise.resolve()
         break
       case "audio_segment_done":
         if (isRecordingRef.current || preventAutoPlayRef.current ||
@@ -768,16 +775,22 @@ function Podcast() {
           segmentChunksRef.current = []
           break
         }
-        ;(async () => {
-          const chunks = [...segmentChunksRef.current]
-          segmentChunksRef.current = []
+        {
+        const chunks = [...segmentChunksRef.current]
+        segmentChunksRef.current = []
+        // The context this segment belongs to. If the answer is stopped or replaced
+        // before the segment is decoded, it no longer matches and the segment is dropped.
+        const segCtx = qaAudioCtxRef.current
+        qaScheduleChainRef.current = qaScheduleChainRef.current.then(async () => {
           if (chunks.length === 0) return
           try {
             const blob = new Blob(chunks, { type: 'audio/wav' })
             const arrayBuffer = await blob.arrayBuffer()
             const audioCtx = qaAudioCtxRef.current
-            if (!audioCtx || audioCtx.state === 'closed') return
+            if (!audioCtx || audioCtx !== segCtx || audioCtx.state === 'closed') return
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+            // Stop may have been pressed while this segment was decoding
+            if (audioCtx !== qaAudioCtxRef.current || audioCtx.state === 'closed') return
             const source = audioCtx.createBufferSource()
             source.buffer = audioBuffer
             source.connect(audioCtx.destination)
@@ -801,11 +814,16 @@ function Podcast() {
           } catch (e) {
             console.error('[audio] Failed to decode segment:', e)
           }
-        })()
+        })
+        }
         break
-      case "complete":
+      case "complete": {
         // "complete" means the backend finished SENDING; the answer is usually still
         // playing, and the timeout below resets the status when playback really ends.
+        // Wait for the queue so the last segment is included in the end time.
+        const completeCtx = qaAudioCtxRef.current
+        qaScheduleChainRef.current.then(() => {
+        if (qaAudioCtxRef.current !== completeCtx) return  // stopped or replaced meanwhile
         if (qaAudioCtxRef.current && qaNextStartTimeRef.current > 0) {
           setStatusMessage("🔊 Playing answer...")
           const remaining = (qaNextStartTimeRef.current - qaAudioCtxRef.current.currentTime) * 1000
@@ -816,6 +834,7 @@ function Podcast() {
               console.log("[auto-resume] Q&A finished, resuming daily brief")
               setAudioMode('RESUMING_BRIEF')
               setTimeout(() => {
+                silenceStreamingAnswer()  // guarantee no Q&A audio under the brief
                 briefAudioRef.current.currentTime = savedBriefPosition.current
                 briefAudioRef.current.play()
                 setBriefAudioPlaying(true)
@@ -831,13 +850,15 @@ function Podcast() {
               console.log("[follow-up] Q&A finished but in follow-up mode - brief stays paused")
               setStatusMessage("Ask another question or return to daily brief")
             }
-          }, Math.max(0, remaining))
+          }, Math.max(0, remaining) + 250)  // small margin past the last sample
         } else {
           // Nothing left to play (answer was stopped, or no audio came back)
           setIsPlaying(false)
           setStatusMessage(getDefaultStatusMessage())
         }
+        })
         break
+      }
       case "error":
         setStatusMessage(`❌ Error: ${data.error}`)
         setIsRecording(false)
@@ -1209,6 +1230,7 @@ function Podcast() {
     console.log("[return-to-brief] User manually returning to daily brief")
 
     // Fully stop Q&A audio (complete cleanup)
+    silenceStreamingAnswer()
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause()
       audioPlayerRef.current.currentTime = 0
