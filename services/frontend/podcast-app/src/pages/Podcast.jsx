@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 // Removed orb components
 import { useVAD } from '../hooks/useVAD'
 
+// Hands-free (voice activity detection) mode is unreliable right now, so it is
+// switched off and its toggle hidden. Set to true to bring both back.
+const HANDS_FREE_ENABLED = false
+
 function Podcast() {
   const navigate = useNavigate()
 
@@ -28,7 +32,7 @@ function Podcast() {
   }
   const [statusMessage, setStatusMessage] = useState(() => {
     const saved = localStorage.getItem('vad_enabled')
-    const isVadEnabled = saved === 'true'
+    const isVadEnabled = HANDS_FREE_ENABLED && saved === 'true'
     return isVadEnabled ? "Ask away, I'm ready!" : "Click the microphone to ask a question"
   })
   const [menuOpen, setMenuOpen] = useState(false)
@@ -62,7 +66,7 @@ function Podcast() {
   // Load VAD preference from localStorage (defaults to false if not set)
   const [vadEnabled, setVadEnabled] = useState(() => {
     const saved = localStorage.getItem('vad_enabled')
-    return saved === 'true' // Convert string to boolean
+    return HANDS_FREE_ENABLED && saved === 'true' // Convert string to boolean
   })
   const [micPermissionGranted, setMicPermissionGranted] = useState(false) // Track if mic permission granted (for iOS)
 
@@ -790,6 +794,8 @@ function Podcast() {
               if (vadEnabled && vad && !vad.loading && !vad.errored) {
                 vad.start()
                 setStatusMessage("🎤 Playing answer... (Speak to ask a follow-up question)")
+              } else {
+                setStatusMessage("🔊 Playing answer...")
               }
             }
           } catch (e) {
@@ -798,8 +804,10 @@ function Podcast() {
         })()
         break
       case "complete":
-        setStatusMessage("✅ Complete! Playing podcast...")
+        // "complete" means the backend finished SENDING; the answer is usually still
+        // playing, and the timeout below resets the status when playback really ends.
         if (qaAudioCtxRef.current && qaNextStartTimeRef.current > 0) {
+          setStatusMessage("🔊 Playing answer...")
           const remaining = (qaNextStartTimeRef.current - qaAudioCtxRef.current.currentTime) * 1000
           qaEndTimeoutRef.current = setTimeout(() => {
             setIsPlaying(false)
@@ -825,7 +833,9 @@ function Podcast() {
             }
           }, Math.max(0, remaining))
         } else {
+          // Nothing left to play (answer was stopped, or no audio came back)
           setIsPlaying(false)
+          setStatusMessage(getDefaultStatusMessage())
         }
         break
       case "error":
@@ -1629,6 +1639,7 @@ function Podcast() {
               </motion.button>
 
               {/* Voice Detection Toggle Switch */}
+              {HANDS_FREE_ENABLED && (
               <div className="flex flex-col items-center gap-2">
                 <div className="relative inline-flex items-center">
                   {/* Label - Hands-free (left side) */}
@@ -1663,6 +1674,7 @@ function Podcast() {
                   </span>
                 </div>
               </div>
+              )}
 
               {/* Stop Q&A Answer Button (shows when Q&A audio is playing) */}
               <AnimatePresence>
