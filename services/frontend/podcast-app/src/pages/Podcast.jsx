@@ -100,6 +100,25 @@ function Podcast() {
     }
   }, [vadEnabled])
 
+  // Silence a streaming Q&A answer. Answers play as Web Audio segments scheduled on
+  // qaAudioCtxRef, not through audioPlayerRef (the old <audio> player), so pausing
+  // audioPlayerRef alone left the answer playing. Closing the context stops every
+  // scheduled segment at once, and segments still arriving for this answer are
+  // dropped because audio_segment_done skips a closed context. The next answer
+  // opens a fresh context on "streaming_audio".
+  const silenceStreamingAnswer = () => {
+    if (qaAudioCtxRef.current && qaAudioCtxRef.current.state !== 'closed') {
+      qaAudioCtxRef.current.close()
+    }
+    segmentChunksRef.current = []
+    qaNextStartTimeRef.current = 0
+    isStreamingAudioRef.current = false
+    if (qaEndTimeoutRef.current) {
+      clearTimeout(qaEndTimeoutRef.current)
+      qaEndTimeoutRef.current = null
+    }
+  }
+
   // Handle voice interruption when VAD detects speech
   const handleVoiceInterruption = () => {
     console.log('[vad] Voice detected!')
@@ -157,6 +176,7 @@ function Podcast() {
       console.log('[vad] Interruption mode activated - protecting VAD state')
 
       // Stop current Q&A playback
+      silenceStreamingAnswer()
       if (audioPlayerRef.current) {
         audioPlayerRef.current.pause()
         audioPlayerRef.current.currentTime = 0
@@ -1120,6 +1140,8 @@ function Podcast() {
   // Stop Q&A playback only (no auto-resume side effects) - Bug Fix #2
   const stopQAPlaybackOnly = () => {
     console.log("[playback] Stopping Q&A playback without auto-resume")
+
+    silenceStreamingAnswer()
 
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause()

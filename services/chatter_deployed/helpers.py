@@ -141,13 +141,11 @@ YOUR TASK:
 1. Synthesize the information from the news article chunks above into a clear, factual podcast segment
 2. Directly answer the listener's question using specific details, numbers, and quotes from the article chunks
 3. Present information authoritatively - you are delivering news, not seeking clarification
-4. Structure your response with these elements:
-- OPENING: Directly state the answer to the question
-- KEY FACTS: Present the most important details with specific numbers, names, and dates. BE SURE TO MENTION THE
-ARTICLE SOURCE (NEWS TITLE) THE KEY FACT DERIVES FROM WHEN STATING THE KEY FACT.
-- CONTEXT: Provide background information and explain implications
-- CLOSING: Brief summary statement (NO invitation for follow-up questions)
-5. Target 50 words for a comprehensive answer. KEEP THE ANSWER CONCISE! DO NOT GIVE A LONG ANSWER!!!!!!!
+4. Answer in EXACTLY 2-3 short sentences:
+- Sentence 1: directly answer the question
+- Sentence 2: the single most important fact, with a number or name, naming the article source
+- Optional sentence 3: why it matters
+5. HARD LIMIT: 60 words. This is read aloud; long answers make the listener wait. Leave out secondary details.
 6. IMPORTANT: You may make reasonable inferences and draw connections from related information in the articles.
 If the articles contain relevant context, related topics, or similar subject matter, use that information to provide
 a helpful answer. Be flexible in interpreting what counts as "relevant" - synonyms, related concepts, and contextual
@@ -167,18 +165,12 @@ DELIVERY STYLE:
 - When referencing information, naturally mention the article title in your narration
 - Example: "According to the Harvard Gazette article 'Budget Cuts Impact Research,' the university..."
 
-EXAMPLE STRUCTURE:
-"Harvard is facing significant budget challenges this year. According to recent reports, the university posted
-a $113 million operating deficit in fiscal year 2025 - its first since 2020. This deficit stems from multiple factors,
-including the Trump administration's temporary termination of nearly all federal research grants in spring 2025,
-which removed approximately $116 million in sponsored funds overnight. To address these shortfalls,
-Harvard has implemented several cost-cutting measures: freezing salaries for non-union staff,
-leaving positions unfilled, and conducting targeted workforce reductions including 38 IT workers in November.
-The situation is compounded by a scheduled 400 percent increase in the federal endowment tax taking effect in
-2027. Despite these challenges, Harvard's endowment grew 11.9 percent to $56.9 billion in fiscal 2025,
-which financial officers credit as central to navigating this uncertain period."
+EXAMPLE (note the length -- match it):
+"Harvard is running its first operating deficit since 2020. According to the Harvard Gazette, the university lost
+$113 million in fiscal 2025, largely after federal research grants were cut. That is why it has frozen staff
+salaries and paused hiring."
 
-Now generate your podcast segment answering the listener's question:"""
+Now answer the listener's question in 2-3 sentences, under 60 words:"""
     else:
         print("[gemini-debug] Using NO-CONTEXT prompt (else block)")
         prompt = f"""You are NewsJuice, the AI host of a news podcast about Harvard University.
