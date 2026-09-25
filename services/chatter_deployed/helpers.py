@@ -36,6 +36,8 @@ import psycopg
 import json
 import os
 from datetime import datetime, timezone
+from google import genai
+from google.genai import types as genai_types
 
 # from vertexai.generative_models import GenerativeModel
 
@@ -208,10 +210,32 @@ changes. For information on this topic, you may want to check the Harvard Gazett
 
 Now generate your response:"""
 
-    response = await model.generate_content_async(prompt, stream=True)
-    async for chunk in response:
+    # Stream through google-genai with thinking disabled. Gemini 2.5 Flash "thinks"
+    # silently before its first token by default; on this prompt that was 11-23 s
+    # of dead air. With thinking_budget=0 the first token arrives in ~0.5 s.
+    # (The older vertexai SDK used for `model` has no way to turn thinking off.)
+    stream = await _genai_client().aio.models.generate_content_stream(
+        model="gemini-2.5-flash", contents=prompt, config=_NO_THINKING
+    )
+    async for chunk in stream:
         if chunk.text:
             yield chunk.text
+
+
+_GENAI_CLIENT = None
+_NO_THINKING = genai_types.GenerateContentConfig(thinking_config=genai_types.ThinkingConfig(thinking_budget=0))
+
+
+def _genai_client():
+    """One shared google-genai client (Vertex AI backend), created on first use."""
+    global _GENAI_CLIENT
+    if _GENAI_CLIENT is None:
+        _GENAI_CLIENT = genai.Client(
+            vertexai=True,
+            project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+            location=os.environ.get("GOOGLE_CLOUD_REGION", "us-central1"),
+        )
+    return _GENAI_CLIENT
 
 
 def check_llm_conversations_table():  # [Z] check_llm_convos is not used by our current workflow.
