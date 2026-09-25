@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 import os
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # uploadfile handels audio file auploads from frontend
 from fastapi import (
@@ -731,8 +731,11 @@ async def generate_daily_brief_endpoint(request: Request):
                 # If content preferences exist, compare timestamps
                 if content_prefs_updated:
                     content_updated = datetime.fromisoformat(content_prefs_updated.replace("Z", "+00:00"))
-                    # Voice updated more recently than content = voice only change
-                    if voice_updated > content_updated:
+                    # Voice updated meaningfully later than content = voice-only change.
+                    # One "save" click writes every preference separately, so the voice row
+                    # lands a millisecond after the others; without a margin that single
+                    # save looked like a voice-only change and the brief was never rebuilt.
+                    if voice_updated - content_updated > timedelta(seconds=5):
                         voice_only_change = True
                         print(
                             f"[daily-brief] Only voice preference changed (voice: {voice_updated}, "
@@ -925,13 +928,13 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
         You are a professional news anchor creating a daily briefing for Harvard community members.
 
         OBJECTIVE:
-        Create an engaging, comprehensive daily news summary covering the most important Harvard news stories from
+        Create an engaging, concise daily news summary covering the most important Harvard news stories from
         the provided articles.
 
         STRUCTURE:
         1. Opening: Brief welcome and overview of today's top stories (mention the date)
-        2. Main stories: Cover 3-5 major developments in detail with proper context
-        3. Quick hits: Mention 2-3 additional noteworthy items briefly
+        2. Main stories: Cover the 3 most important developments, 2-3 sentences each
+        3. Quick hits: Mention 1-2 additional noteworthy items in one sentence each
         4. Closing: Brief wrap-up
 
         DELIVERY STYLE:
@@ -947,7 +950,8 @@ topics_str = preference.get("topics", "[]") pulls the list of preferred topics (
         IMPORTANT:
         - Focus on the most significant and interesting stories
         - Provide context and explain why stories matter to the Harvard community
-        - Keep total length around 3-5 minutes when spoken (approximately 500-750 words)
+        - Keep total length around 1 minute when spoken (approximately 150-200 words). Brevity matters:
+          the listener hears nothing until the whole script is written and voiced.
         - Be authoritative and well-informed
         - Make it engaging - this is the user's personalized morning briefing
 
