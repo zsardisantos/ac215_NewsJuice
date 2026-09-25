@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import auth
 from typing import Dict
+import os
 
 """Firebase Admin SDK initialization and token verification."""
 
@@ -39,7 +40,10 @@ def initialize_firebase_admin():
 
     # this is firebase authorization for the cloud deployment
     try:
-        firebase_admin.initialize_app()
+        # firebase_admin.initialize_app()
+        project_id = os.environ.get("FIREBASE_PROJECT_ID")
+        options = {"projectId": project_id} if project_id else None
+        firebase_admin.initialize_app(options=options)
         print("[firebase-admin] Initialized with default credentials")
     except Exception as e:
         print(f"[firebase-admin-error] Failed to initialize: {e}")

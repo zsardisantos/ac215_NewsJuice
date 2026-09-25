@@ -47,8 +47,8 @@ from fastapi import (
 # streaming response stream audio chunks back to frontend
 from speech_to_text_client import audio_to_text  # Speech-to-Text function
 from text_to_speech_client import (
-    text_to_audio_stream,
     text_to_audio_bytes,
+    synthesize_and_stream_segments,
 )  # Google Cloud Text-to-Speech streaming and non-streaming
 from gcs_storage import upload_audio_to_gcs  # GCS storage for audio files
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,7 +69,7 @@ from user_db import (
 
 # importing helper functions
 # from chatter_handler import chatter [Z] we do not need the chatter_handler.py script
-from helpers import call_retriever_service, call_gemini_api
+from helpers import call_retriever_service, call_gemini_api_stream
 from query_enhancement import enhance_query_with_gemini
 from retriever import search_articles_by_preferences
 
@@ -288,49 +288,34 @@ async def _retrieve_and_generate_podcast(
     combined_enhanced_query = "\n".join([enhanced_queries[k] for k in query_keys])
     print(f"This is the enhanced query {combined_enhanced_query}")
 
-    podcast_text, error = call_gemini_api(combined_enhanced_query, all_chunks, model)
-    print(f"Here is the Podcast Text {podcast_text}")
+    # step 3+4: stream Gemini tokens → sentence TTS segments → WebSocket audio
+    # Get voice preference before streaming starts
+    voice_preference = None
+    if user_id:
+        preferences = get_user_preferences(user_id)
+        voice_preference = preferences.get("voice_preference", "en-US-Chirp3-HD-Aoede")
+        print(f"[websocket] Using voice preference: {voice_preference}")
 
-    if error or not podcast_text:
-        await websocket.send_json({"error": f"LLM error: {error}"})
-        return False
+    await websocket.send_json({"status": "streaming_audio"})
 
-    await websocket.send_json({"status": "podcast_generated", "text": podcast_text})
-
-    # step4: convert podcast text to audio
-    await websocket.send_json({"status": "converting_to_audio"})
     try:
-        # Get user's voice preference if authenticated
-        voice_preference = None
-        if user_id:
-            preferences = get_user_preferences(user_id)
-            voice_preference = preferences.get("voice_preference", "en-US-Studio-O")
-            print(f"[websocket] Using voice preference: {voice_preference}")
-
-        await websocket.send_json({"status": "streaming_audio"})
-        result = await text_to_audio_stream(podcast_text, websocket, voice_name=voice_preference)
-
-        if not result:
-            await websocket.send_json({"error": "Failed to generate audio stream"})
-            return False
-
-        await websocket.send_json({"status": "complete"})
-
-        # Save audio history if user is authenticated
-        # [Z] For Q&A we don't save audio to GCS (just the text)
-
-        if user_id:
-            save_audio_history(
-                user_id=user_id,
-                question_text=original_query,
-                podcast_text=podcast_text,
-                audio_url=None,
-            )
-            print(f"[websocket] Audio history saved for user: {user_id}")
-
+        token_stream = call_gemini_api_stream(combined_enhanced_query, all_chunks, model)
+        await synthesize_and_stream_segments(token_stream, voice_preference, websocket)
     except Exception as e:
-        await websocket.send_json({"error": f"TTS failed: {str(e)}"})
+        await websocket.send_json({"error": f"Streaming failed: {str(e)}"})
         return False
+
+    await websocket.send_json({"status": "complete"})
+
+    # Save audio history if user is authenticated
+    if user_id:
+        save_audio_history(
+            user_id=user_id,
+            question_text=original_query,
+            podcast_text=None,  # full text not assembled in streaming mode
+            audio_url=None,
+        )
+        print(f"[websocket] Audio history saved for user: {user_id}")
 
     return True
 

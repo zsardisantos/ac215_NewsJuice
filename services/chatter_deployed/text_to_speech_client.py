@@ -100,6 +100,61 @@ async def text_to_audio_stream(text: str, websocket, voice_name: Optional[str] =
         traceback.print_exc()
         return None
 
+async def synthesize_and_stream_segments(token_stream, voice_name, websocket):
+    """
+    Consumes a (sync) Gemini token stream, accumulates into segments at sentence
+    boundaries (≥200 chars), synthesizes each segment via TTS, and streams WAV
+    bytes + a JSON 'audio_segment_done' signal per segment to the WebSocket.
+    """
+    import asyncio
+
+    client = texttospeech.TextToSpeechClient()
+    default_voice = "en-US-Chirp3-HD-Aoede"
+    selected_voice = voice_name if voice_name else default_voice
+
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="en-US",
+        name=selected_voice,
+    )
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+        sample_rate_hertz=24000,
+        speaking_rate=1.0,
+        pitch=0.0,
+    )
+
+    buffer = ""
+
+    async def flush_segment(text):
+        text = text.strip()
+        if not text:
+            return
+        print(f"[stream-tts] Synthesizing segment ({len(text)} chars): {text[:60]}...")
+        pcm = await asyncio.get_event_loop().run_in_executor(
+            None, _synthesize_chunk, client, text, voice, audio_config
+        )
+        if pcm:
+            wav = _pcm_to_wav(pcm, sample_rate=24000)
+            await websocket.send_bytes(wav)
+            await websocket.send_json({"status": "audio_segment_done"})
+
+    async for token in token_stream:          # sync generator from Gemini
+        buffer += token
+        # Flush when we have ≥200 chars AND are at a sentence boundary
+        if len(buffer) >= 200 and re.search(r'[.!?]\s', buffer):
+            # Split at the last sentence boundary
+            match = None
+            for m in re.finditer(r'[.!?]\s', buffer):
+                match = m
+            if match:
+                segment = buffer[:match.end()]
+                buffer = buffer[match.end():]
+                await flush_segment(segment)
+
+    # Flush any remaining text
+    await flush_segment(buffer)
+
+
 
 def _pcm_to_wav(
     pcm_data: bytes,
