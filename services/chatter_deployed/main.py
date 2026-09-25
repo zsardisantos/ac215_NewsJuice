@@ -69,7 +69,7 @@ from user_db import (
 
 # importing helper functions
 # from chatter_handler import chatter [Z] we do not need the chatter_handler.py script
-from helpers import call_retriever_service, call_gemini_api_stream
+from helpers import call_retriever_service, call_gemini_api_stream, _genai_client, _NO_THINKING
 from query_enhancement import enhance_query_with_gemini
 from retriever import search_articles_by_preferences
 
@@ -973,7 +973,10 @@ Now generate your daily briefing:"""
             # the call_gemini_api() is a script that is solely used for the interactive Q&A
             # creating a separate helper for one use case is "overkill" according to claude, I think it is actually
             # helpful, but eh
-            response = model.generate_content(full_prompt)
+            # thinking off: ~8.5 s -> ~3 s for a 200-word script
+            response = _genai_client().models.generate_content(
+                model="gemini-2.5-flash", contents=full_prompt, config=_NO_THINKING
+            )
             podcast_text = response.text
 
             if not podcast_text:

@@ -139,9 +139,20 @@ async def synthesize_and_stream_segments(token_stream, voice_name, websocket):
             await websocket.send_bytes(wav)
             await websocket.send_json({"status": "audio_segment_done"})
 
+    first_segment = True
+
     async for token in token_stream:          # sync generator from Gemini
         buffer += token
-        # Flush when we have ≥200 chars AND are at a sentence boundary
+        # The first segment is spoken as soon as ONE sentence is complete, so the
+        # listener hears something fast. Later segments batch >=200 chars at a
+        # sentence boundary, which sounds smoother and costs fewer TTS calls.
+        if first_segment:
+            m = next((m for m in re.finditer(r'[.!?]\s', buffer) if m.end() >= 40), None)
+            if m:
+                segment, buffer = buffer[:m.end()], buffer[m.end():]
+                await flush_segment(segment)
+                first_segment = False
+            continue
         if len(buffer) >= 200 and re.search(r'[.!?]\s', buffer):
             # Split at the last sentence boundary
             match = None

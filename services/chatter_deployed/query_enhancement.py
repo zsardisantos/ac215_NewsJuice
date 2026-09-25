@@ -11,6 +11,7 @@ import json
 import re
 from typing import Optional, Tuple, Dict
 from vertexai.generative_models import GenerativeModel
+from helpers import _genai_client, _NO_THINKING
 
 
 def load_system_prompt() -> str:
@@ -116,7 +117,10 @@ USER QUERY: {user_query}
 Please provide your response in the required JSON format."""
 
         # Call Gemini
-        response = model.generate_content(prompt)
+        # thinking off: rewriting a question doesn't need it (saves ~1 s)
+        response = _genai_client().models.generate_content(
+            model="gemini-2.5-flash", contents=prompt, config=_NO_THINKING
+        )
         response_text = response.text
 
         # Parse the response

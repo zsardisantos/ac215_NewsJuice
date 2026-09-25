@@ -421,7 +421,10 @@ Examples of GENERAL questions (NOT contextual):
 
 Respond with ONLY ONE word - either "CONTEXTUAL" or "GENERAL":"""
 
-        response = model.generate_content(prompt)
+        # thinking off: a one-word label doesn't need it (saves ~1 s)
+        response = _genai_client().models.generate_content(
+            model="gemini-2.5-flash", contents=prompt, config=_NO_THINKING
+        )
         classification = response.text.strip().upper()
 
         # Validate response
