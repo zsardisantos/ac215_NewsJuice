@@ -152,6 +152,9 @@ your demo questions from this list, not from memory of November's corpus.
 
 ## Step 5 — Run chatter (20 min)
 
+> `--env-file .env` matters: `main.py` imports `user_db` (which requires `DATABASE_URL`)
+> before it calls `load_dotenv()`, so without it the server fails to start in a fresh tab.
+
 ```bash
 cp demo-local/env.local.example services/chatter_deployed/.env
 # edit: GOOGLE_CLOUD_PROJECT + GOOGLE_APPLICATION_CREDENTIALS
@@ -160,7 +163,7 @@ cp demo-local/env.local.example services/chatter_deployed/.env
 ```bash
 cd services/chatter_deployed
 uv sync --all-extras
-uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+uv run uvicorn main:app --env-file .env --host 0.0.0.0 --port 8080 --reload
 ```
 
 Health check:

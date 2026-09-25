@@ -52,6 +52,7 @@ from text_to_speech_client import (
 )  # Google Cloud Text-to-Speech streaming and non-streaming
 from gcs_storage import upload_audio_to_gcs  # GCS storage for audio files
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 import json
 import base64
 from firebase_auth import initialize_firebase_admin, verify_token
@@ -248,10 +249,13 @@ async def _retrieve_and_generate_podcast(
         all_chunks = []
 
         # [Z] assume each sub query runs cosine similarity against the DB to pull chunks
-        for query_key in query_keys:
-            sub_query = enhanced_queries[query_key]
-            print(f"[retriever] Running retrieval for sub-query: {sub_query[:50]}...")
-            chunks = call_retriever_service(sub_query)
+        # Each search is a blocking network call, so run them all at once in worker
+        # threads: total time is the slowest search instead of the sum of all of them.
+        # gather() preserves order, so deduplication below keeps the same results.
+        search_results = await asyncio.gather(
+            *[asyncio.to_thread(call_retriever_service, enhanced_queries[k]) for k in query_keys]
+        )
+        for query_key, chunks in zip(query_keys, search_results):
             if chunks:
                 # Print each chunk with its similarity score
                 print(f"[retriever] Found {len(chunks)} chunks for '{query_key}':")
